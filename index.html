@@ -19,21 +19,14 @@ h1 {
     color: #1565c0;
 }
 
-button {
-    padding: 14px 20px;
-    margin: 7px;
-    border: 0;
-    border-radius: 12px;
-    background: #1976d2;
-    color: white;
-    font-size: 16px;
-    font-weight: bold;
-}
-
-.camera {
+.container {
     width: 95%;
     max-width: 700px;
     margin: auto;
+}
+
+.camera-box {
+    position: relative;
     background: #111;
     border-radius: 20px;
     overflow: hidden;
@@ -44,228 +37,452 @@ video {
     display: block;
 }
 
-.info {
-    background: white;
-    width: 90%;
-    max-width: 600px;
-    margin: 20px auto;
-    padding: 20px;
-    border-radius: 18px;
+canvas {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
 }
 
-select {
-    padding: 12px;
+button {
+    padding: 14px 20px;
+    margin: 8px;
+    border: none;
+    border-radius: 12px;
+    background: #1976d2;
+    color: white;
     font-size: 16px;
-    border-radius: 10px;
+    font-weight: bold;
 }
 
-.quiz {
+.info, .quiz {
     background: white;
-    width: 90%;
-    max-width: 600px;
     margin: 20px auto;
     padding: 20px;
     border-radius: 18px;
+}
+
+.detected {
+    font-size: 22px;
+    font-weight: bold;
+    color: #1565c0;
+}
+
+#loading {
+    color: #d97706;
+    font-weight: bold;
 }
 </style>
 </head>
 
 <body>
 
-<h1>📐 GEOMETRY AI AR</h1>
+<div class="container">
 
-<p>Halakan kamera kepada objek di sekeliling anda.</p>
+<h1>📐 GEOMETRY AI</h1>
 
-<div class="camera">
+<p>
+Halakan kamera kepada objek.
+</p>
 
-    <video id="camera" autoplay playsinline></video>
+<p id="loading">
+🤖 Sedang memuatkan AI...
+</p>
+
+<div class="camera-box">
+
+    <video id="video" autoplay playsinline muted></video>
+
+    <canvas id="canvas"></canvas>
 
 </div>
 
-<button id="startCamera">
+<button id="start">
 📷 Mula Kamera
 </button>
 
 <div class="info">
 
-    <h2>🔎 Bentuk Dikesan</h2>
+    <h2>🔎 Objek Dikesan</h2>
 
-    <select id="shape">
+    <div id="detected">
+        Belum ada objek.
+    </div>
 
-        <option value="kuboid">📦 Kuboid</option>
-        <option value="kubus">🧊 Kubus</option>
-        <option value="silinder">🥫 Silinder</option>
-        <option value="sfera">⚽ Sfera</option>
-        <option value="piramid">🔺 Piramid</option>
+    <div id="confidence"></div>
 
-    </select>
+    <hr>
 
-    <button onclick="showInfo()">
-        Lihat Maklumat
-    </button>
-
-    <div id="result">
-
-        <p>Pilih bentuk untuk melihat maklumat.</p>
-
+    <div id="geometry">
+        Bentuk geometri akan muncul di sini.
     </div>
 
 </div>
 
+
 <div class="quiz">
 
-    <h2>📝 Kuiz</h2>
+<h2>📝 Kuiz Geometry</h2>
 
-    <p>
-        Apakah bentuk 3D yang mempunyai
-        <b>6 sisi, 8 bucu dan 12 rusuk</b>?
-    </p>
+<p>
+Bentuk manakah mempunyai
+<b>6 sisi, 8 bucu dan 12 rusuk?</b>
+</p>
 
-    <button onclick="answer(false)">
-        A. Silinder
-    </button>
+<button onclick="checkAnswer(false)">
+A. Sfera
+</button>
 
-    <button onclick="answer(true)">
-        B. Kuboid
-    </button>
+<button onclick="checkAnswer(true)">
+B. Kuboid
+</button>
 
-    <button onclick="answer(false)">
-        C. Sfera
-    </button>
+<button onclick="checkAnswer(false)">
+C. Silinder
+</button>
 
-    <button onclick="answer(false)">
-        D. Piramid
-    </button>
+<button onclick="checkAnswer(false)">
+D. Kon
+</button>
 
-    <p id="quizResult"></p>
+<p id="quizResult"></p>
 
 </div>
 
+</div>
+
+
+<!-- TensorFlow -->
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0"></script>
+
+<!-- COCO-SSD -->
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+
+
 <script>
 
-const video = document.getElementById("camera");
+const video = document.getElementById("video");
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
 
-document.getElementById("startCamera")
+const detected = document.getElementById("detected");
+const confidence = document.getElementById("confidence");
+const geometry = document.getElementById("geometry");
+const loading = document.getElementById("loading");
+
+let model = null;
+let cameraStarted = false;
+
+
+/* =========================
+   MUAT AI
+========================= */
+
+async function loadAI() {
+
+    try {
+
+        model = await cocoSsd.load();
+
+        loading.innerHTML =
+        "✅ AI sudah bersedia.";
+
+    }
+
+    catch(error) {
+
+        loading.innerHTML =
+        "❌ AI gagal dimuatkan.";
+
+        console.error(error);
+
+    }
+
+}
+
+loadAI();
+
+
+/* =========================
+   MULA KAMERA
+========================= */
+
+document.getElementById("start")
 .addEventListener("click", async function() {
 
     try {
 
         const stream =
         await navigator.mediaDevices.getUserMedia({
+
             video: {
                 facingMode: {
                     ideal: "environment"
                 }
             },
+
             audio: false
+
         });
 
         video.srcObject = stream;
 
-    } catch (error) {
+        cameraStarted = true;
+
+        video.onloadedmetadata = function() {
+
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+
+            detectObjects();
+
+        };
+
+    }
+
+    catch(error) {
 
         alert(
-            "Kamera tidak dapat dibuka. Pastikan anda menggunakan HTTPS dan benarkan akses kamera."
+        "Kamera tidak dapat dibuka. Sila benarkan akses kamera."
         );
+
+        console.error(error);
 
     }
 
 });
 
 
-function showInfo() {
+/* =========================
+   DETECT OBJECT
+========================= */
 
-    const shape =
-    document.getElementById("shape").value;
+async function detectObjects() {
 
-    const result =
-    document.getElementById("result");
+    if (!model || !cameraStarted) {
 
-    let html = "";
+        requestAnimationFrame(detectObjects);
 
-    if (shape === "kuboid") {
-
-        html = `
-        <h2>📦 KUBOID</h2>
-        <p>🔵 Sisi: <b>6</b></p>
-        <p>🟢 Bucu: <b>8</b></p>
-        <p>🟠 Rusuk: <b>12</b></p>
-        <p>Setiap muka berbentuk segi empat tepat.</p>
-        `;
+        return;
 
     }
 
-    if (shape === "kubus") {
+    const predictions =
+    await model.detect(video);
 
-        html = `
-        <h2>🧊 KUBUS</h2>
-        <p>🔵 Sisi: <b>6</b></p>
-        <p>🟢 Bucu: <b>8</b></p>
-        <p>🟠 Rusuk: <b>12</b></p>
-        <p>Semua sisinya berbentuk segi empat sama.</p>
-        `;
 
-    }
+    ctx.clearRect(
+        0,
+        0,
+        canvas.width,
+        canvas.height
+    );
 
-    if (shape === "silinder") {
 
-        html = `
-        <h2>🥫 SILINDER</h2>
-        <p>🔵 Sisi: <b>3</b></p>
-        <p>🟢 Bucu: <b>0</b></p>
-        <p>🟠 Rusuk: <b>2</b></p>
-        <p>Mempunyai dua permukaan bulat.</p>
-        `;
+    let best = null;
 
-    }
 
-    if (shape === "sfera") {
+    for (const prediction of predictions) {
 
-        html = `
-        <h2>⚽ SFERA</h2>
-        <p>🔵 Sisi: <b>1</b></p>
-        <p>🟢 Bucu: <b>0</b></p>
-        <p>🟠 Rusuk: <b>0</b></p>
-        <p>Permukaannya melengkung.</p>
-        `;
+        if (!best ||
+            prediction.score > best.score) {
+
+            best = prediction;
+
+        }
 
     }
 
-    if (shape === "piramid") {
 
-        html = `
-        <h2>🔺 PIRAMID</h2>
-        <p>🔵 Sisi: <b>5</b></p>
-        <p>🟢 Bucu: <b>5</b></p>
-        <p>🟠 Rusuk: <b>8</b></p>
-        <p>Mempunyai satu tapak dan sisi berbentuk segi tiga.</p>
-        `;
+    if (best) {
+
+        const name = best.class;
+        const score = best.score;
+
+
+        /* kotak detection */
+
+        if (
+            name === "book" ||
+            name === "laptop" ||
+            name === "keyboard" ||
+            name === "cell phone"
+        ) {
+
+            showGeometry(
+                "📦 KUBOID",
+                score,
+                "6",
+                "8",
+                "12"
+            );
+
+        }
+
+
+        /* botol */
+
+        else if (
+            name === "bottle" ||
+            name === "wine glass" ||
+            name === "cup"
+        ) {
+
+            showGeometry(
+                "🥫 SILINDER",
+                score,
+                "3",
+                "0",
+                "2"
+            );
+
+        }
+
+
+        /* bola */
+
+        else if (
+            name === "sports ball"
+        ) {
+
+            showGeometry(
+                "⚽ SFERA",
+                score,
+                "1",
+                "0",
+                "0"
+            );
+
+        }
+
+        else {
+
+            detected.innerHTML =
+                "🤔 " + name;
+
+            confidence.innerHTML =
+                "Keyakinan AI: " +
+                Math.round(score * 100) +
+                "%";
+
+            geometry.innerHTML =
+                "Objek ini belum dipetakan kepada bentuk geometri.";
+
+        }
+
+
+        /* lukis kotak */
+
+        const [x,y,w,h] =
+        best.bbox;
+
+        ctx.strokeStyle = "#00ff88";
+
+        ctx.lineWidth = 4;
+
+        ctx.strokeRect(
+            x,
+            y,
+            w,
+            h
+        );
+
+
+        ctx.fillStyle = "#00ff88";
+
+        ctx.font = "20px Arial";
+
+        ctx.fillText(
+            name +
+            " " +
+            Math.round(score * 100) +
+            "%",
+            x,
+            Math.max(25,y - 8)
+        );
 
     }
 
-    result.innerHTML = html;
+    else {
+
+        detected.innerHTML =
+        "🔍 Tiada objek dikesan.";
+
+        confidence.innerHTML = "";
+
+    }
+
+
+    requestAnimationFrame(detectObjects);
 
 }
 
 
-function answer(correct) {
+/* =========================
+   MAKLUMAT GEOMETRI
+========================= */
 
-    const output =
+function showGeometry(
+    shape,
+    score,
+    sides,
+    vertices,
+    edges
+) {
+
+    detected.innerHTML =
+        "<div class='detected'>" +
+        shape +
+        "</div>";
+
+    confidence.innerHTML =
+        "Keyakinan AI: " +
+        Math.round(score * 100) +
+        "%";
+
+    geometry.innerHTML = `
+
+        <p>🔵 Bilangan sisi:
+        <b>${sides}</b></p>
+
+        <p>🟢 Bilangan bucu:
+        <b>${vertices}</b></p>
+
+        <p>🟠 Bilangan rusuk:
+        <b>${edges}</b></p>
+
+    `;
+
+}
+
+
+/* =========================
+   KUIZ
+========================= */
+
+function checkAnswer(correct) {
+
+    const result =
     document.getElementById("quizResult");
 
     if (correct) {
 
-        output.innerHTML =
-        "🎉 Betul! Jawapannya ialah KUBOID.";
+        result.innerHTML =
+        "🎉 Betul! Kuboid mempunyai 6 sisi, 8 bucu dan 12 rusuk.";
 
-        output.style.color = "green";
+        result.style.color = "green";
 
-    } else {
+    }
 
-        output.innerHTML =
-        "❌ Cuba lagi.";
+    else {
 
-        output.style.color = "red";
+        result.innerHTML =
+        "❌ Cuba lagi!";
+
+        result.style.color = "red";
 
     }
 
