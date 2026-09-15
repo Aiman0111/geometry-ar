@@ -8,8 +8,13 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 
 <style>
+* {
+    box-sizing: border-box;
+}
+
 body {
     margin: 0;
     font-family: Arial, sans-serif;
@@ -19,7 +24,7 @@ body {
 }
 
 h1 {
-    margin: 12px;
+    margin: 15px 0;
 }
 
 #cameraBox {
@@ -27,40 +32,69 @@ h1 {
     width: 95%;
     max-width: 700px;
     margin: auto;
-    overflow: hidden;
     border-radius: 15px;
+    overflow: hidden;
+    background: black;
 }
 
-video {
+#video {
     width: 100%;
     display: block;
 }
 
-canvas {
+#detectCanvas {
     position: absolute;
-    left: 0;
-    top: 0;
+    inset: 0;
     width: 100%;
     height: 100%;
+    pointer-events: none;
+}
+
+#threeCanvas {
+    position: absolute;
+    width: 220px;
+    height: 220px;
+    pointer-events: auto;
     touch-action: none;
+    display: none;
 }
 
 #info {
-    margin: 15px auto;
     width: 90%;
     max-width: 600px;
-    padding: 15px;
+    margin: 15px auto;
+    padding: 18px;
     background: #222;
-    border-radius: 12px;
+    border-radius: 15px;
 }
 
-button {
-    padding: 12px 20px;
+#shapeName {
+    font-size: 28px;
     margin: 5px;
-    border: none;
+}
+
+.details {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+}
+
+.detail {
+    background: #333;
+    padding: 10px 16px;
     border-radius: 10px;
-    font-size: 16px;
-    cursor: pointer;
+}
+
+#instruction {
+    margin-top: 15px;
+    color: #ddd;
+}
+
+#status {
+    margin: 10px;
+    color: #aaa;
 }
 </style>
 </head>
@@ -69,128 +103,453 @@ button {
 
 <h1>📐 Geometry AR</h1>
 
+<div id="status">
+Memuatkan kamera dan AI...
+</div>
+
 <div id="cameraBox">
+
     <video id="video" autoplay playsinline></video>
-    <canvas id="canvas"></canvas>
+
+    <canvas id="detectCanvas"></canvas>
+
+    <canvas id="threeCanvas"></canvas>
+
 </div>
 
 <div id="info">
-    <h2 id="shapeName">Mencari objek...</h2>
-    <p id="instruction">
+
+    <div id="shapeName">
+        Mencari bentuk...
+    </div>
+
+    <div class="details">
+
+        <div class="detail">
+            Sisi: <b id="sides">-</b>
+        </div>
+
+        <div class="detail">
+            Bucu: <b id="vertices">-</b>
+        </div>
+
+        <div class="detail">
+            Rusuk: <b id="edges">-</b>
+        </div>
+
+    </div>
+
+    <div id="instruction">
         Halakan kamera kepada objek.
-    </p>
+    </div>
+
 </div>
 
-<button onclick="resetRotation()">🔄 Reset Putaran</button>
 
 <script>
 
 const video = document.getElementById("video");
-const canvas = document.getElementById("canvas");
-const ctx = canvas.getContext("2d");
+const detectCanvas = document.getElementById("detectCanvas");
+const detectCtx = detectCanvas.getContext("2d");
+
+const threeCanvas = document.getElementById("threeCanvas");
+
+const shapeName = document.getElementById("shapeName");
+const sides = document.getElementById("sides");
+const vertices = document.getElementById("vertices");
+const edges = document.getElementById("edges");
+const instruction = document.getElementById("instruction");
+const statusText = document.getElementById("status");
 
 let model;
 
-let currentShape = null;
-let currentBox = null;
+let renderer;
+let scene;
+let camera3D;
+let object3D;
 
-let rotationX = 0;
-let rotationY = 0;
+let currentShape = null;
+
+let targetX = 0;
+let targetY = 0;
 
 let dragging = false;
-let lastX = 0;
-let lastY = 0;
+let previousX = 0;
+let previousY = 0;
 
 
-// ===============================
+// ==================================================
+// THREE.JS
+// ==================================================
+
+function setup3D() {
+
+    renderer = new THREE.WebGLRenderer({
+        canvas: threeCanvas,
+        alpha: true,
+        antialias: true
+    });
+
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(220, 220, false);
+
+    scene = new THREE.Scene();
+
+    camera3D = new THREE.PerspectiveCamera(
+        45,
+        1,
+        0.1,
+        100
+    );
+
+    camera3D.position.z = 5;
+
+    const light1 = new THREE.DirectionalLight(
+        0xffffff,
+        2
+    );
+
+    light1.position.set(3, 4, 5);
+
+    scene.add(light1);
+
+    const light2 = new THREE.AmbientLight(
+        0xffffff,
+        1.2
+    );
+
+    scene.add(light2);
+
+    animate3D();
+}
+
+
+// ==================================================
+// BUAT OBJEK 3D
+// ==================================================
+
+function create3DShape(shape) {
+
+    if (!scene) return;
+
+    if (object3D) {
+
+        scene.remove(object3D);
+
+    }
+
+    if (shape === "SILINDER") {
+
+        const geometry =
+            new THREE.CylinderGeometry(
+                1,
+                1,
+                2.2,
+                48
+            );
+
+        const material =
+            new THREE.MeshStandardMaterial({
+                color: 0x00d9ff,
+                transparent: true,
+                opacity: 0.78,
+                roughness: 0.25,
+                metalness: 0.1
+            });
+
+        object3D =
+            new THREE.Mesh(
+                geometry,
+                material
+            );
+
+    }
+
+
+    if (shape === "SFERA") {
+
+        const geometry =
+            new THREE.SphereGeometry(
+                1.25,
+                48,
+                32
+            );
+
+        const material =
+            new THREE.MeshStandardMaterial({
+                color: 0xffd43b,
+                transparent: true,
+                opacity: 0.8
+            });
+
+        object3D =
+            new THREE.Mesh(
+                geometry,
+                material
+            );
+
+    }
+
+
+    if (shape === "KUBOID") {
+
+        const geometry =
+            new THREE.BoxGeometry(
+                2.2,
+                1.5,
+                1.5
+            );
+
+        const material =
+            new THREE.MeshStandardMaterial({
+                color: 0xff66dd,
+                transparent: true,
+                opacity: 0.78
+            });
+
+        object3D =
+            new THREE.Mesh(
+                geometry,
+                material
+            );
+
+    }
+
+
+    if (object3D) {
+
+        scene.add(object3D);
+
+        targetX = 0;
+        targetY = 0;
+
+        object3D.rotation.x = 0;
+        object3D.rotation.y = 0;
+
+    }
+
+}
+
+
+// ==================================================
+// ANIMASI 3D
+// ==================================================
+
+function animate3D() {
+
+    requestAnimationFrame(animate3D);
+
+    if (object3D) {
+
+        object3D.rotation.x +=
+            (targetX - object3D.rotation.x) * 0.15;
+
+        object3D.rotation.y +=
+            (targetY - object3D.rotation.y) * 0.15;
+
+    }
+
+    renderer.render(
+        scene,
+        camera3D
+    );
+
+}
+
+
+// ==================================================
+// PUTAR DENGAN JARI
+// ==================================================
+
+threeCanvas.addEventListener(
+    "pointerdown",
+    function(event) {
+
+        dragging = true;
+
+        previousX = event.clientX;
+        previousY = event.clientY;
+
+        threeCanvas.setPointerCapture(
+            event.pointerId
+        );
+
+    }
+);
+
+
+threeCanvas.addEventListener(
+    "pointermove",
+    function(event) {
+
+        if (!dragging) return;
+
+        const movementX =
+            event.clientX - previousX;
+
+        const movementY =
+            event.clientY - previousY;
+
+        targetY += movementX * 0.015;
+
+        targetX += movementY * 0.015;
+
+        previousX = event.clientX;
+        previousY = event.clientY;
+
+    }
+);
+
+
+threeCanvas.addEventListener(
+    "pointerup",
+    function() {
+
+        dragging = false;
+
+    }
+);
+
+
+threeCanvas.addEventListener(
+    "pointercancel",
+    function() {
+
+        dragging = false;
+
+    }
+);
+
+
+// ==================================================
 // CAMERA
-// ===============================
+// ==================================================
 
 async function startCamera() {
 
     try {
 
-        const stream = await navigator.mediaDevices.getUserMedia({
-            video: {
-                facingMode: {
-                    ideal: "environment"
-                }
-            },
-            audio: false
-        });
+        const stream =
+            await navigator.mediaDevices.getUserMedia({
+
+                video: {
+                    facingMode: {
+                        ideal: "environment"
+                    }
+                },
+
+                audio: false
+
+            });
 
         video.srcObject = stream;
 
         await video.play();
 
-        resizeCanvas();
+        resizeDetectionCanvas();
 
-        model = await cocoSsd.load();
+        statusText.innerText =
+            "Memuatkan AI...";
+
+        model =
+            await cocoSsd.load();
+
+        statusText.innerText =
+            "AI siap. Halakan kamera kepada objek.";
 
         detectObjects();
 
-    } catch(error) {
+    }
 
-        alert("Kamera tidak dapat dibuka: " + error);
+    catch(error) {
+
+        statusText.innerText =
+            "Kamera tidak dapat dibuka.";
+
+        console.error(error);
 
     }
 
 }
 
 
-// ===============================
-// CANVAS
-// ===============================
+// ==================================================
+// CANVAS KAMERA
+// ==================================================
 
-function resizeCanvas() {
+function resizeDetectionCanvas() {
 
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    detectCanvas.width =
+        video.videoWidth;
+
+    detectCanvas.height =
+        video.videoHeight;
 
 }
 
-video.addEventListener("loadedmetadata", resizeCanvas);
+video.addEventListener(
+    "loadedmetadata",
+    resizeDetectionCanvas
+);
 
 
-// ===============================
-// DETECT OBJECT
-// ===============================
+// ==================================================
+// AI DETECTION
+// ==================================================
 
 async function detectObjects() {
 
     if (!model) return;
 
-    const predictions = await model.detect(video);
+    const predictions =
+        await model.detect(video);
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    detectCtx.clearRect(
+        0,
+        0,
+        detectCanvas.width,
+        detectCanvas.height
+    );
+
 
     if (predictions.length > 0) {
 
-        const object = predictions[0];
+        const object =
+            predictions[0];
 
-        const shape = getShape(object.class);
+        const shape =
+            getShape(object.class);
+
 
         if (shape) {
 
-            currentShape = shape;
-            currentBox = object.bbox;
+            drawDetection(
+                object.bbox
+            );
 
-            drawARShape(object.bbox, shape);
+            showShape(
+                shape,
+                object.score
+            );
 
-            showInfo(shape, object.score);
+            position3D(
+                object.bbox
+            );
 
         }
 
     }
 
-    requestAnimationFrame(detectObjects);
+    requestAnimationFrame(
+        detectObjects
+    );
 
 }
 
 
-// ===============================
-// TUKAR OBJEK → BENTUK GEOMETRI
-// ===============================
+// ==================================================
+// TUKAR OBJEK KEPADA BENTUK
+// ==================================================
 
 function getShape(object) {
 
@@ -200,12 +559,18 @@ function getShape(object) {
         object === "wine glass" ||
         object === "vase"
     ) {
+
         return "SILINDER";
+
     }
 
+
     if (object === "sports ball") {
+
         return "SFERA";
+
     }
+
 
     if (
         object === "book" ||
@@ -214,7 +579,9 @@ function getShape(object) {
         object === "cell phone" ||
         object === "remote"
     ) {
+
         return "KUBOID";
+
     }
 
     return null;
@@ -222,27 +589,89 @@ function getShape(object) {
 }
 
 
-// ===============================
-// MAKLUMAT BENTUK
-// ===============================
+// ==================================================
+// PAPAR MAKLUMAT
+// ==================================================
 
-function showInfo(shape, score) {
+function showShape(shape, confidence) {
 
-    document.getElementById("shapeName").innerText =
-        "Bentuk: " + shape;
+    shapeName.innerText =
+        "🔷 " + shape;
 
-    document.getElementById("instruction").innerText =
-        "👆 Tarik objek dengan jari untuk memutarkannya • Keyakinan: "
-        + Math.round(score * 100) + "%";
+
+    if (shape === "SILINDER") {
+
+        sides.innerText = "3";
+        vertices.innerText = "0";
+        edges.innerText = "2";
+
+    }
+
+
+    if (shape === "SFERA") {
+
+        sides.innerText = "1";
+        vertices.innerText = "0";
+        edges.innerText = "0";
+
+    }
+
+
+    if (shape === "KUBOID") {
+
+        sides.innerText = "6";
+        vertices.innerText = "8";
+        edges.innerText = "12";
+
+    }
+
+
+    instruction.innerText =
+        "👆 Sentuh dan tarik objek 3D untuk memutarkannya";
+
+    if (currentShape !== shape) {
+
+        currentShape = shape;
+
+        create3DShape(shape);
+
+    }
 
 }
 
 
-// ===============================
-// LUKIS OBJEK
-// ===============================
+// ==================================================
+// KOTAK DETECTION
+// ==================================================
 
-function drawARShape(box, shape) {
+function drawDetection(box) {
+
+    const x = box[0];
+    const y = box[1];
+    const w = box[2];
+    const h = box[3];
+
+
+    detectCtx.strokeStyle =
+        "#00ff88";
+
+    detectCtx.lineWidth = 4;
+
+    detectCtx.strokeRect(
+        x,
+        y,
+        w,
+        h
+    );
+
+}
+
+
+// ==================================================
+// LETAK OBJEK 3D
+// ==================================================
+
+function position3D(box) {
 
     const x = box[0];
     const y = box[1];
@@ -250,301 +679,41 @@ function drawARShape(box, shape) {
     const w = box[2];
     const h = box[3];
 
-    const cx = x + w / 2;
-    const cy = y + h / 2;
 
-    // bounding box
-    ctx.strokeStyle = "#00ff88";
-    ctx.lineWidth = 3;
+    const centerX =
+        x + w / 2;
 
-    ctx.strokeRect(x, y, w, h);
-
-    // objek
-    if (shape === "SILINDER") {
-
-        drawCylinder(cx, cy, Math.min(w,h) / 3, h / 2);
-
-    }
-
-    if (shape === "SFERA") {
-
-        drawSphere(cx, cy, Math.min(w,h) / 3);
-
-    }
-
-    if (shape === "KUBOID") {
-
-        drawCuboid(cx, cy, Math.min(w,h) / 2);
-
-    }
-
-}
+    const centerY =
+        y + h / 2;
 
 
-// ===============================
-// SILINDER
-// ===============================
+    const scaleX =
+        threeCanvas.parentElement.clientWidth /
+        detectCanvas.width;
 
-function drawCylinder(cx, cy, radius, height) {
-
-    ctx.save();
-
-    ctx.translate(cx, cy);
-
-    ctx.rotate(rotationY * Math.PI / 180);
-
-    ctx.strokeStyle = "#00ffff";
-    ctx.lineWidth = 5;
-
-    const ry = radius * 0.35;
-
-    // atas
-    ctx.beginPath();
-
-    ctx.ellipse(
-        0,
-        -height / 2,
-        radius,
-        ry,
-        rotationX * Math.PI / 180,
-        0,
-        Math.PI * 2
-    );
-
-    ctx.stroke();
+    const scaleY =
+        threeCanvas.parentElement.clientHeight /
+        detectCanvas.height;
 
 
-    // badan
-    ctx.beginPath();
+    threeCanvas.style.left =
+        (centerX * scaleX - 110) + "px";
 
-    ctx.moveTo(-radius, -height / 2);
-    ctx.lineTo(-radius, height / 2);
-
-    ctx.moveTo(radius, -height / 2);
-    ctx.lineTo(radius, height / 2);
-
-    ctx.stroke();
+    threeCanvas.style.top =
+        (centerY * scaleY - 110) + "px";
 
 
-    // bawah
-    ctx.beginPath();
-
-    ctx.ellipse(
-        0,
-        height / 2,
-        radius,
-        ry,
-        rotationX * Math.PI / 180,
-        0,
-        Math.PI * 2
-    );
-
-    ctx.stroke();
-
-    ctx.restore();
+    threeCanvas.style.display =
+        "block";
 
 }
 
 
-// ===============================
-// SFERA
-// ===============================
-
-function drawSphere(cx, cy, radius) {
-
-    ctx.save();
-
-    ctx.translate(cx, cy);
-
-    ctx.rotate(rotationY * Math.PI / 180);
-
-    ctx.strokeStyle = "#ffff00";
-    ctx.lineWidth = 4;
-
-    ctx.beginPath();
-
-    ctx.arc(
-        0,
-        0,
-        radius,
-        0,
-        Math.PI * 2
-    );
-
-    ctx.stroke();
-
-
-    // garisan melintang
-    ctx.beginPath();
-
-    ctx.ellipse(
-        0,
-        0,
-        radius,
-        radius * 0.35,
-        rotationX * Math.PI / 180,
-        0,
-        Math.PI * 2
-    );
-
-    ctx.stroke();
-
-
-    // garisan menegak
-    ctx.beginPath();
-
-    ctx.ellipse(
-        0,
-        0,
-        radius * 0.35,
-        radius,
-        rotationY * Math.PI / 180,
-        0,
-        Math.PI * 2
-    );
-
-    ctx.stroke();
-
-    ctx.restore();
-
-}
-
-
-// ===============================
-// KUBOID
-// ===============================
-
-function drawCuboid(cx, cy, size) {
-
-    ctx.save();
-
-    ctx.translate(cx, cy);
-
-    const angleX = rotationX * Math.PI / 180;
-    const angleY = rotationY * Math.PI / 180;
-
-    ctx.strokeStyle = "#ff66ff";
-    ctx.lineWidth = 5;
-
-    const depth = size * 0.35;
-
-    // depan
-    ctx.strokeRect(
-        -size / 2,
-        -size / 2,
-        size,
-        size
-    );
-
-
-    // belakang
-    ctx.strokeRect(
-        -size / 2 + depth * Math.cos(angleY),
-        -size / 2 + depth * Math.sin(angleX),
-        size,
-        size
-    );
-
-
-    // sambungan
-    ctx.beginPath();
-
-    ctx.moveTo(-size/2, -size/2);
-
-    ctx.lineTo(
-        -size/2 + depth * Math.cos(angleY),
-        -size/2 + depth * Math.sin(angleX)
-    );
-
-    ctx.moveTo(size/2, -size/2);
-
-    ctx.lineTo(
-        size/2 + depth * Math.cos(angleY),
-        -size/2 + depth * Math.sin(angleX)
-    );
-
-    ctx.moveTo(-size/2, size/2);
-
-    ctx.lineTo(
-        -size/2 + depth * Math.cos(angleY),
-        size/2 + depth * Math.sin(angleX)
-    );
-
-    ctx.moveTo(size/2, size/2);
-
-    ctx.lineTo(
-        size/2 + depth * Math.cos(angleY),
-        size/2 + depth * Math.sin(angleX)
-    );
-
-    ctx.stroke();
-
-    ctx.restore();
-
-}
-
-
-// ===============================
-// PUTAR DENGAN JARI
-// ===============================
-
-canvas.addEventListener("pointerdown", function(e) {
-
-    if (!currentBox) return;
-
-    dragging = true;
-
-    lastX = e.clientX;
-    lastY = e.clientY;
-
-});
-
-
-canvas.addEventListener("pointermove", function(e) {
-
-    if (!dragging) return;
-
-    const dx = e.clientX - lastX;
-    const dy = e.clientY - lastY;
-
-    rotationY += dx * 0.8;
-    rotationX += dy * 0.8;
-
-    lastX = e.clientX;
-    lastY = e.clientY;
-
-});
-
-
-canvas.addEventListener("pointerup", function() {
-
-    dragging = false;
-
-});
-
-
-canvas.addEventListener("pointercancel", function() {
-
-    dragging = false;
-
-});
-
-
-// ===============================
-// RESET
-// ===============================
-
-function resetRotation() {
-
-    rotationX = 0;
-    rotationY = 0;
-
-}
-
-
-// ===============================
-// START
-// ===============================
+// ==================================================
+// MULAKAN
+// ==================================================
+
+setup3D();
 
 startCamera();
 
