@@ -3,9 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Geometry AI</title>
+
+<title>Geometry AI AR</title>
 
 <style>
+
 body{
     margin:0;
     font-family:Arial,sans-serif;
@@ -16,7 +18,7 @@ body{
 
 .container{
     width:95%;
-    max-width:750px;
+    max-width:800px;
     margin:auto;
 }
 
@@ -28,16 +30,16 @@ h1{
     position:relative;
     width:100%;
     background:#111;
-    border-radius:18px;
+    border-radius:20px;
     overflow:hidden;
 }
 
-video{
+#video{
     width:100%;
     display:block;
 }
 
-#detectCanvas{
+#canvas{
     position:absolute;
     left:0;
     top:0;
@@ -46,10 +48,10 @@ video{
 }
 
 button{
+    padding:13px 18px;
+    margin:6px;
     border:0;
     border-radius:12px;
-    padding:14px 20px;
-    margin:8px;
     background:#1976d2;
     color:white;
     font-size:16px;
@@ -63,8 +65,8 @@ button{
     border-radius:18px;
 }
 
-.detected{
-    font-size:25px;
+.shape{
+    font-size:28px;
     font-weight:bold;
     color:#1565c0;
 }
@@ -78,6 +80,7 @@ button{
     font-weight:bold;
     margin:12px;
 }
+
 </style>
 </head>
 
@@ -85,9 +88,9 @@ button{
 
 <div class="container">
 
-<h1>📐 GEOMETRY AI</h1>
+<h1>📐 GEOMETRY AI AR</h1>
 
-<p>Halakan kamera kepada objek di sekeliling anda.</p>
+<p>Halakan kamera kepada objek.</p>
 
 <div id="status">
 🤖 Memuatkan AI...
@@ -100,26 +103,23 @@ button{
        playsinline
        muted></video>
 
-<canvas id="detectCanvas"></canvas>
+<canvas id="canvas"></canvas>
 
 </div>
 
-<button id="startCamera">
+<button id="start">
 📷 MULA KAMERA
 </button>
-
 
 <div class="info">
 
 <h2>🔎 Bentuk Dikesan</h2>
 
-<div id="detected">
-Belum ada objek.
+<div id="shape">
+Belum ada bentuk.
 </div>
 
 <div id="confidence"></div>
-
-<hr>
 
 <div id="geometry">
 Halakan kamera kepada objek.
@@ -130,24 +130,20 @@ Halakan kamera kepada objek.
 
 <div class="quiz">
 
-<h2>📝 Kuiz Geometry</h2>
+<h2>📝 KUIZ</h2>
 
 <div id="question">
-
-Soalan akan muncul selepas bentuk dikesan.
-
+Soalan akan muncul apabila bentuk dikesan.
 </div>
 
 <div id="answers"></div>
 
-<div id="quizResult"></div>
+<div id="result"></div>
 
 </div>
 
 </div>
 
-
-<!-- AI -->
 
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0"></script>
 
@@ -156,32 +152,23 @@ Soalan akan muncul selepas bentuk dikesan.
 
 <script>
 
-const video =
+const video=
 document.getElementById("video");
 
-const canvas =
-document.getElementById("detectCanvas");
+const canvas=
+document.getElementById("canvas");
 
-const ctx =
+const ctx=
 canvas.getContext("2d");
 
-const status =
+const status=
 document.getElementById("status");
-
-const detected =
-document.getElementById("detected");
-
-const confidence =
-document.getElementById("confidence");
-
-const geometry =
-document.getElementById("geometry");
 
 let model=null;
 
 let running=false;
 
-let lastShape="";
+let currentShape="";
 
 
 /* =========================
@@ -192,10 +179,11 @@ async function loadAI(){
 
     try{
 
-        model=await cocoSsd.load();
+        model=
+        await cocoSsd.load();
 
         status.innerHTML=
-        "✅ AI sudah bersedia. Tekan MULA KAMERA.";
+        "✅ AI bersedia. Tekan MULA KAMERA.";
 
     }
 
@@ -214,17 +202,18 @@ loadAI();
 
 
 /* =========================
-   CAMERA
+   START CAMERA
 ========================= */
 
 document
-.getElementById("startCamera")
+.getElementById("start")
 .addEventListener("click",async()=>{
 
     try{
 
         const stream=
-        await navigator.mediaDevices.getUserMedia({
+        await navigator.mediaDevices
+        .getUserMedia({
 
             video:{
                 facingMode:{
@@ -241,13 +230,15 @@ document
         running=true;
 
         status.innerHTML=
-        "📷 Kamera aktif. Halakan kepada objek.";
+        "📷 Kamera aktif.";
 
         video.onloadedmetadata=()=>{
 
-            canvas.width=video.videoWidth;
+            canvas.width=
+            video.videoWidth;
 
-            canvas.height=video.videoHeight;
+            canvas.height=
+            video.videoHeight;
 
             detect();
 
@@ -268,12 +259,12 @@ document
 
 
 /* =========================
-   OBJECT DETECTION
+   DETECTION
 ========================= */
 
 async function detect(){
 
-    if(!running || !model){
+    if(!model || !running){
 
         requestAnimationFrame(detect);
 
@@ -299,7 +290,8 @@ async function detect(){
 
     for(const p of predictions){
 
-        if(!best || p.score>best.score){
+        if(!best ||
+           p.score>best.score){
 
             best=p;
 
@@ -308,43 +300,47 @@ async function detect(){
     }
 
 
-    if(best){
+    if(best && best.score>0.45){
 
-        const objectName=
+        const object=
         best.class;
 
         const score=
         best.score;
 
-
-        drawBox(best);
-
-
         const shape=
-        convertToShape(objectName);
+        getShape(object);
+
+
+        drawDetection(
+            best,
+            shape
+        );
 
 
         if(shape){
 
             showShape(
                 shape,
-                objectName,
-                score
+                object,
+                score,
+                best.bbox
             );
 
         }
 
         else{
 
-            detected.innerHTML=
-            "🤔 "+objectName;
+            document
+            .getElementById("shape")
+            .innerHTML=
+            "🤔 "+object;
 
-            confidence.innerHTML=
-            "Keyakinan AI: "+
+            document
+            .getElementById("confidence")
+            .innerHTML=
+            "Keyakinan: "+
             Math.round(score*100)+"%";
-
-            geometry.innerHTML=
-            "Objek ini belum dipetakan kepada bentuk geometri.";
 
         }
 
@@ -352,10 +348,21 @@ async function detect(){
 
     else{
 
-        detected.innerHTML=
-        "🔍 Tiada objek dikesan.";
+        document
+        .getElementById("shape")
+        .innerHTML=
+        "🔍 Tiada objek.";
 
-        confidence.innerHTML="";
+        document
+        .getElementById("confidence")
+        .innerHTML="";
+
+        ctx.clearRect(
+            0,
+            0,
+            canvas.width,
+            canvas.height
+        );
 
     }
 
@@ -366,15 +373,10 @@ async function detect(){
 
 
 /* =========================
-   MAP OBJECT → GEOMETRY
+   OBJECT → SHAPE
 ========================= */
 
-function convertToShape(object){
-
-    object=object.toLowerCase();
-
-
-    /* SILINDER */
+function getShape(object){
 
     if(
         object==="bottle" ||
@@ -388,8 +390,6 @@ function convertToShape(object){
     }
 
 
-    /* SFERA */
-
     if(
         object==="sports ball"
     ){
@@ -398,8 +398,6 @@ function convertToShape(object){
 
     }
 
-
-    /* KUBOID */
 
     if(
         object==="book" ||
@@ -420,20 +418,424 @@ function convertToShape(object){
 
 
 /* =========================
-   PAPAR BENTUK
+   DRAW DETECTION
+========================= */
+
+function drawDetection(
+    prediction,
+    shape
+){
+
+    const x=
+    prediction.bbox[0];
+
+    const y=
+    prediction.bbox[1];
+
+    const w=
+    prediction.bbox[2];
+
+    const h=
+    prediction.bbox[3];
+
+
+    ctx.strokeStyle=
+    "#00ff88";
+
+    ctx.lineWidth=4;
+
+    ctx.strokeRect(
+        x,
+        y,
+        w,
+        h
+    );
+
+
+    ctx.fillStyle=
+    "#00ff88";
+
+    ctx.font=
+    "bold 18px Arial";
+
+    ctx.fillText(
+        prediction.class,
+        x,
+        Math.max(22,y-7)
+    );
+
+
+    /* MODEL 3D */
+
+    if(shape){
+
+        draw3DShape(
+            shape,
+            x,
+            y,
+            w,
+            h
+        );
+
+    }
+
+}
+
+
+/* =========================
+   3D SHAPE
+========================= */
+
+function draw3DShape(
+    shape,
+    x,
+    y,
+    w,
+    h
+){
+
+    const cx=
+    x+w/2;
+
+    const cy=
+    y+h/2;
+
+
+    if(shape==="silinder"){
+
+        drawCylinder(
+            cx,
+            cy,
+            Math.min(w,h)*0.32,
+            h*0.8
+        );
+
+    }
+
+
+    if(shape==="sfera"){
+
+        drawSphere(
+            cx,
+            cy,
+            Math.min(w,h)*0.38
+        );
+
+    }
+
+
+    if(shape==="kuboid"){
+
+        drawCuboid(
+            cx,
+            cy,
+            Math.min(w,h)*0.35
+        );
+
+    }
+
+}
+
+
+/* =========================
+   CYLINDER
+========================= */
+
+function drawCylinder(
+    cx,
+    cy,
+    radius,
+    height
+){
+
+    const top=
+    cy-height/2;
+
+    const bottom=
+    cy+height/2;
+
+
+    ctx.fillStyle=
+    "rgba(0,180,255,0.35)";
+
+    ctx.strokeStyle=
+    "#00ffff";
+
+    ctx.lineWidth=4;
+
+
+    ctx.beginPath();
+
+    ctx.ellipse(
+        cx,
+        top,
+        radius,
+        radius*0.32,
+        0,
+        0,
+        Math.PI*2
+    );
+
+    ctx.fill();
+
+    ctx.stroke();
+
+
+    ctx.fillRect(
+        cx-radius,
+        top,
+        radius*2,
+        height
+    );
+
+
+    ctx.beginPath();
+
+    ctx.moveTo(
+        cx-radius,
+        top
+    );
+
+    ctx.lineTo(
+        cx-radius,
+        bottom
+    );
+
+    ctx.moveTo(
+        cx+radius,
+        top
+    );
+
+    ctx.lineTo(
+        cx+radius,
+        bottom
+    );
+
+    ctx.stroke();
+
+
+    ctx.beginPath();
+
+    ctx.ellipse(
+        cx,
+        bottom,
+        radius,
+        radius*0.32,
+        0,
+        0,
+        Math.PI*2
+    );
+
+    ctx.stroke();
+
+
+    ctx.fillStyle="white";
+
+    ctx.font=
+    "bold 18px Arial";
+
+    ctx.textAlign="center";
+
+    ctx.fillText(
+        "SILINDER",
+        cx,
+        cy+7
+    );
+
+}
+
+
+/* =========================
+   SPHERE
+========================= */
+
+function drawSphere(
+    cx,
+    cy,
+    radius
+){
+
+    const gradient=
+    ctx.createRadialGradient(
+        cx-radius*0.35,
+        cy-radius*0.35,
+        5,
+        cx,
+        cy,
+        radius
+    );
+
+
+    gradient.addColorStop(
+        0,
+        "rgba(255,255,255,0.8)"
+    );
+
+    gradient.addColorStop(
+        1,
+        "rgba(0,150,255,0.45)"
+    );
+
+
+    ctx.fillStyle=
+    gradient;
+
+    ctx.strokeStyle=
+    "#00ffff";
+
+    ctx.lineWidth=4;
+
+
+    ctx.beginPath();
+
+    ctx.arc(
+        cx,
+        cy,
+        radius,
+        0,
+        Math.PI*2
+    );
+
+    ctx.fill();
+
+    ctx.stroke();
+
+
+    ctx.fillStyle="white";
+
+    ctx.font=
+    "bold 18px Arial";
+
+    ctx.textAlign="center";
+
+    ctx.fillText(
+        "SFERA",
+        cx,
+        cy+7
+    );
+
+}
+
+
+/* =========================
+   CUBOID
+========================= */
+
+function drawCuboid(
+    cx,
+    cy,
+    size
+){
+
+    const offset=
+    size*0.45;
+
+
+    ctx.fillStyle=
+    "rgba(0,150,255,0.35)";
+
+    ctx.strokeStyle=
+    "#00ffff";
+
+    ctx.lineWidth=4;
+
+
+    ctx.beginPath();
+
+    ctx.rect(
+        cx-size,
+        cy-size,
+        size*2,
+        size*1.5
+    );
+
+    ctx.fill();
+
+    ctx.stroke();
+
+
+    ctx.beginPath();
+
+    ctx.moveTo(
+        cx-size,
+        cy-size
+    );
+
+    ctx.lineTo(
+        cx-size+offset,
+        cy-size-offset
+    );
+
+    ctx.lineTo(
+        cx+size+offset,
+        cy-size-offset
+    );
+
+    ctx.lineTo(
+        cx+size,
+        cy-size
+    );
+
+    ctx.stroke();
+
+
+    ctx.beginPath();
+
+    ctx.moveTo(
+        cx+size,
+        cy-size
+    );
+
+    ctx.lineTo(
+        cx+size+offset,
+        cy-size-offset
+    );
+
+    ctx.lineTo(
+        cx+size+offset,
+        cy+size*0.5-offset
+    );
+
+    ctx.lineTo(
+        cx+size,
+        cy+size*0.5
+    );
+
+    ctx.stroke();
+
+
+    ctx.fillStyle="white";
+
+    ctx.font=
+    "bold 18px Arial";
+
+    ctx.textAlign="center";
+
+    ctx.fillText(
+        "KUBOID",
+        cx,
+        cy
+    );
+
+}
+
+
+/* =========================
+   INFO
 ========================= */
 
 function showShape(
     shape,
-    objectName,
-    score
+    object,
+    score,
+    bbox
 ){
 
     let name="";
+    let emoji="";
     let sides="";
     let vertices="";
     let edges="";
-    let emoji="";
 
 
     if(shape==="silinder"){
@@ -481,18 +883,24 @@ function showShape(
     }
 
 
-    detected.innerHTML=
-    `<div class="detected">
+    document
+    .getElementById("shape")
+    .innerHTML=
+    `<div class="shape">
     ${emoji} ${name}
     </div>`;
 
 
-    confidence.innerHTML=
-    `AI mengesan: <b>${objectName}</b>
-    (${Math.round(score*100)}%)`;
+    document
+    .getElementById("confidence")
+    .innerHTML=
+    `AI mengesan <b>${object}</b> —
+    ${Math.round(score*100)}%`;
 
 
-    geometry.innerHTML=`
+    document
+    .getElementById("geometry")
+    .innerHTML=`
 
     <div class="stat">
     🔵 Sisi: <b>${sides}</b>
@@ -509,59 +917,13 @@ function showShape(
     `;
 
 
-    if(lastShape!==shape){
+    if(currentShape!==shape){
 
-        lastShape=shape;
+        currentShape=shape;
 
         createQuiz(shape);
 
     }
-
-}
-
-
-/* =========================
-   DRAW DETECTION BOX
-========================= */
-
-function drawBox(prediction){
-
-    const x=
-    prediction.bbox[0];
-
-    const y=
-    prediction.bbox[1];
-
-    const w=
-    prediction.bbox[2];
-
-    const h=
-    prediction.bbox[3];
-
-
-    ctx.strokeStyle="#00ff88";
-
-    ctx.lineWidth=5;
-
-    ctx.strokeRect(
-        x,
-        y,
-        w,
-        h
-    );
-
-
-    ctx.fillStyle="#00ff88";
-
-    ctx.font="bold 20px Arial";
-
-    ctx.fillText(
-        prediction.class+
-        " "+
-        Math.round(prediction.score*100)+"%",
-        x,
-        Math.max(25,y-8)
-    );
 
 }
 
@@ -573,28 +935,34 @@ function drawBox(prediction){
 function createQuiz(shape){
 
     const question=
-    document.getElementById("question");
+    document.getElementById(
+        "question"
+    );
 
     const answers=
-    document.getElementById("answers");
-
     document.getElementById(
-        "quizResult"
-    ).innerHTML="";
+        "answers"
+    );
 
 
     if(shape==="silinder"){
 
         question.innerHTML=
-        "🥫 Berapakah bilangan bucu pada silinder?";
+        "🥫 Berapakah bilangan bucu silinder?";
 
         answers.innerHTML=`
 
-        <button onclick="quiz(false)">A. 2</button>
+        <button onclick="check(true)">
+        A. 0
+        </button>
 
-        <button onclick="quiz(true)">B. 0</button>
+        <button onclick="check(false)">
+        B. 2
+        </button>
 
-        <button onclick="quiz(false)">C. 4</button>
+        <button onclick="check(false)">
+        C. 4
+        </button>
 
         `;
 
@@ -604,15 +972,17 @@ function createQuiz(shape){
     if(shape==="sfera"){
 
         question.innerHTML=
-        "⚽ Berapakah bilangan bucu pada sfera?";
+        "⚽ Berapakah bilangan bucu sfera?";
 
         answers.innerHTML=`
 
-        <button onclick="quiz(true)">A. 0</button>
+        <button onclick="check(true)">
+        A. 0
+        </button>
 
-        <button onclick="quiz(false)">B. 2</button>
-
-        <button onclick="quiz(false)">C. 4</button>
+        <button onclick="check(false)">
+        B. 2
+        </button>
 
         `;
 
@@ -622,17 +992,25 @@ function createQuiz(shape){
     if(shape==="kuboid"){
 
         question.innerHTML=
-        "📦 Berapakah bilangan sisi pada kuboid?";
+        "📦 Berapakah bilangan sisi kuboid?";
 
         answers.innerHTML=`
 
-        <button onclick="quiz(false)">A. 4</button>
+        <button onclick="check(false)">
+        A. 4
+        </button>
 
-        <button onclick="quiz(true)">B. 6</button>
+        <button onclick="check(true)">
+        B. 6
+        </button>
 
-        <button onclick="quiz(false)">C. 8</button>
+        <button onclick="check(false)">
+        C. 8
+        </button>
 
-        <button onclick="quiz(false)">D. 12</button>
+        <button onclick="check(false)">
+        D. 12
+        </button>
 
         `;
 
@@ -641,20 +1019,21 @@ function createQuiz(shape){
 }
 
 
-function quiz(correct){
+function check(correct){
 
     const result=
     document.getElementById(
-        "quizResult"
+        "result"
     );
 
 
     if(correct){
 
         result.innerHTML=
-        "🎉 BETUL! Tahniah!";
+        "🎉 BETUL!";
 
-        result.style.color="green";
+        result.style.color=
+        "green";
 
     }
 
@@ -663,7 +1042,8 @@ function quiz(correct){
         result.innerHTML=
         "❌ Salah. Cuba lagi.";
 
-        result.style.color="red";
+        result.style.color=
+        "red";
 
     }
 
