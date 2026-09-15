@@ -1,16 +1,22 @@
 <!DOCTYPE html>
 <html lang="ms">
+
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport"
+content="width=device-width, initial-scale=1.0">
 
-<title>Geometry AR</title>
+<title>Geometry AR - Prisma</title>
 
+<!-- AI -->
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+
+<!-- 3D -->
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 
 <style>
+
 * {
     box-sizing: border-box;
 }
@@ -18,13 +24,19 @@
 body {
     margin: 0;
     font-family: Arial, sans-serif;
-    background: #111;
-    color: white;
+    background: #f4f7fb;
+    color: #222;
     text-align: center;
 }
 
 h1 {
-    margin: 15px 0;
+    margin: 15px 0 5px;
+    color: #174ea6;
+}
+
+#status {
+    margin: 8px;
+    color: #555;
 }
 
 #cameraBox {
@@ -32,8 +44,8 @@ h1 {
     width: 95%;
     max-width: 700px;
     margin: auto;
-    border-radius: 15px;
     overflow: hidden;
+    border-radius: 18px;
     background: black;
 }
 
@@ -52,70 +64,161 @@ h1 {
 
 #threeCanvas {
     position: absolute;
-    width: 220px;
-    height: 220px;
-    pointer-events: auto;
-    touch-action: none;
+
+    width: 240px;
+    height: 240px;
+
     display: none;
+
+    touch-action: none;
+    pointer-events: auto;
 }
 
 #info {
-    width: 90%;
-    max-width: 600px;
+    width: 92%;
+    max-width: 650px;
     margin: 15px auto;
     padding: 18px;
-    background: #222;
-    border-radius: 15px;
+
+    background: white;
+
+    border-radius: 18px;
+
+    box-shadow: 0 3px 12px rgba(0,0,0,0.12);
 }
 
 #shapeName {
     font-size: 28px;
-    margin: 5px;
+    font-weight: bold;
+    color: #174ea6;
+
+    margin-bottom: 10px;
+}
+
+#prismaStatus {
+    font-size: 20px;
+    font-weight: bold;
+
+    margin-bottom: 15px;
 }
 
 .details {
-    display: flex;
-    justify-content: center;
+    display: grid;
+
+    grid-template-columns:
+    repeat(2, 1fr);
+
     gap: 10px;
-    flex-wrap: wrap;
-    margin-top: 12px;
 }
 
 .detail {
-    background: #333;
-    padding: 10px 16px;
-    border-radius: 10px;
+    background: #eef3f8;
+
+    padding: 12px;
+
+    border-radius: 12px;
+
+    font-size: 17px;
+}
+
+.detail b {
+    display: block;
+
+    font-size: 25px;
+
+    margin-top: 4px;
+
+    color: #174ea6;
+}
+
+#tapakInfo {
+    margin-top: 15px;
+
+    padding: 12px;
+
+    background: #fff7c2;
+
+    border-radius: 12px;
+
+    font-size: 17px;
+}
+
+#criteria {
+    margin-top: 15px;
+
+    text-align: left;
+
+    padding: 15px;
+
+    background: #f2f8e9;
+
+    border-radius: 12px;
+
+    line-height: 1.6;
 }
 
 #instruction {
     margin-top: 15px;
-    color: #ddd;
+
+    font-weight: bold;
+
+    color: #444;
 }
 
-#status {
-    margin: 10px;
-    color: #aaa;
+button {
+    border: none;
+
+    padding: 12px 20px;
+
+    margin: 8px;
+
+    border-radius: 12px;
+
+    font-size: 16px;
+
+    background: #174ea6;
+
+    color: white;
+
+    cursor: pointer;
 }
+
+button:active {
+    transform: scale(0.97);
+}
+
 </style>
+
 </head>
+
 
 <body>
 
 <h1>📐 Geometry AR</h1>
 
 <div id="status">
-Memuatkan kamera dan AI...
+Memuatkan kamera...
 </div>
+
 
 <div id="cameraBox">
 
-    <video id="video" autoplay playsinline></video>
+    <video
+        id="video"
+        autoplay
+        playsinline>
+    </video>
 
-    <canvas id="detectCanvas"></canvas>
+    <canvas
+        id="detectCanvas">
+    </canvas>
 
-    <canvas id="threeCanvas"></canvas>
+    <canvas
+        id="threeCanvas">
+    </canvas>
 
 </div>
+
 
 <div id="info">
 
@@ -123,21 +226,52 @@ Memuatkan kamera dan AI...
         Mencari bentuk...
     </div>
 
+
+    <div id="prismaStatus">
+        -
+    </div>
+
+
     <div class="details">
 
         <div class="detail">
-            Sisi: <b id="sides">-</b>
+            Permukaan rata
+            <b id="flatSurfaces">-</b>
         </div>
 
-        <div class="detail">
-            Bucu: <b id="vertices">-</b>
-        </div>
 
         <div class="detail">
-            Rusuk: <b id="edges">-</b>
+            Permukaan melengkung
+            <b id="curvedSurfaces">-</b>
+        </div>
+
+
+        <div class="detail">
+            Bucu
+            <b id="vertices">-</b>
+        </div>
+
+
+        <div class="detail">
+            Tepi
+            <b id="edges">-</b>
         </div>
 
     </div>
+
+
+    <div id="tapakInfo">
+        Tapak: -
+    </div>
+
+
+    <div id="criteria">
+        <b>Ciri bentuk:</b>
+        <div id="criteriaText">
+            -
+        </div>
+    </div>
+
 
     <div id="instruction">
         Halakan kamera kepada objek.
@@ -146,91 +280,362 @@ Memuatkan kamera dan AI...
 </div>
 
 
+<button onclick="resetRotation()">
+🔄 Reset Putaran
+</button>
+
+
 <script>
 
-const video = document.getElementById("video");
-const detectCanvas = document.getElementById("detectCanvas");
-const detectCtx = detectCanvas.getContext("2d");
 
-const threeCanvas = document.getElementById("threeCanvas");
+// =====================================================
+// ELEMENT
+// =====================================================
 
-const shapeName = document.getElementById("shapeName");
-const sides = document.getElementById("sides");
-const vertices = document.getElementById("vertices");
-const edges = document.getElementById("edges");
-const instruction = document.getElementById("instruction");
-const statusText = document.getElementById("status");
+const video =
+document.getElementById("video");
+
+const detectCanvas =
+document.getElementById("detectCanvas");
+
+const detectCtx =
+detectCanvas.getContext("2d");
+
+const threeCanvas =
+document.getElementById("threeCanvas");
+
+const statusText =
+document.getElementById("status");
+
+
+// =====================================================
+// MAKLUMAT
+// =====================================================
+
+const shapeName =
+document.getElementById("shapeName");
+
+const prismaStatus =
+document.getElementById("prismaStatus");
+
+const flatSurfaces =
+document.getElementById("flatSurfaces");
+
+const curvedSurfaces =
+document.getElementById("curvedSurfaces");
+
+const vertices =
+document.getElementById("vertices");
+
+const edges =
+document.getElementById("edges");
+
+const tapakInfo =
+document.getElementById("tapakInfo");
+
+const criteriaText =
+document.getElementById("criteriaText");
+
+const instruction =
+document.getElementById("instruction");
+
+
+// =====================================================
+// AI
+// =====================================================
 
 let model;
 
-let renderer;
-let scene;
-let camera3D;
-let object3D;
-
 let currentShape = null;
 
-let targetX = 0;
-let targetY = 0;
+
+// =====================================================
+// THREE.JS
+// =====================================================
+
+let renderer;
+
+let scene;
+
+let camera3D;
+
+let object3D;
+
+
+// =====================================================
+// PUTARAN
+// =====================================================
+
+let rotationX = 0;
+
+let rotationY = 0;
 
 let dragging = false;
+
 let previousX = 0;
+
 let previousY = 0;
 
 
-// ==================================================
-// THREE.JS
-// ==================================================
+// =====================================================
+// MAKLUMAT BENTUK
+// =====================================================
+
+const shapeData = {
+
+    "PRISMA SEGI TIGA": {
+
+        flat: 5,
+
+        curved: 0,
+
+        vertices: 6,
+
+        edges: 9,
+
+        tapak:
+        "2 tapak berbentuk segi tiga",
+
+        prisma: true,
+
+        criteria:
+        "✓ 5 permukaan rata<br>" +
+        "✓ 2 tapak yang sama bentuk dan saiz<br>" +
+        "✓ Tiada permukaan melengkung"
+
+    },
+
+
+    "PRISMA SEGI EMPAT SAMA": {
+
+        flat: 6,
+
+        curved: 0,
+
+        vertices: 8,
+
+        edges: 12,
+
+        tapak:
+        "2 tapak berbentuk segi empat sama",
+
+        prisma: true,
+
+        criteria:
+        "✓ 6 permukaan rata<br>" +
+        "✓ 2 tapak yang sama bentuk dan saiz<br>" +
+        "✓ Tiada permukaan melengkung"
+
+    },
+
+
+    "PRISMA SEGI EMPAT TEPAT": {
+
+        flat: 6,
+
+        curved: 0,
+
+        vertices: 8,
+
+        edges: 12,
+
+        tapak:
+        "2 tapak berbentuk segi empat tepat",
+
+        prisma: true,
+
+        criteria:
+        "✓ 6 permukaan rata<br>" +
+        "✓ 2 tapak yang sama bentuk dan saiz<br>" +
+        "✓ Tiada permukaan melengkung"
+
+    },
+
+
+    "SILINDER": {
+
+        flat: 2,
+
+        curved: 1,
+
+        vertices: 0,
+
+        edges: 2,
+
+        tapak:
+        "2 tapak berbentuk bulatan",
+
+        prisma: false,
+
+        criteria:
+        "✗ Mempunyai permukaan melengkung<br>" +
+        "✗ Bukan prisma"
+
+    },
+
+
+    "SFERA": {
+
+        flat: 0,
+
+        curved: 1,
+
+        vertices: 0,
+
+        edges: 0,
+
+        tapak:
+        "Tiada tapak",
+
+        prisma: false,
+
+        criteria:
+        "✗ Tiada permukaan rata<br>" +
+        "✗ Mempunyai permukaan melengkung<br>" +
+        "✗ Bukan prisma"
+
+    },
+
+
+    "KON": {
+
+        flat: 1,
+
+        curved: 1,
+
+        vertices: 1,
+
+        edges: 1,
+
+        tapak:
+        "1 tapak berbentuk bulatan",
+
+        prisma: false,
+
+        criteria:
+        "✗ Mempunyai permukaan melengkung<br>" +
+        "✗ Hanya mempunyai 1 tapak<br>" +
+        "✗ Bukan prisma"
+
+    },
+
+
+    "PIRAMID": {
+
+        flat: 5,
+
+        curved: 0,
+
+        vertices: 5,
+
+        edges: 8,
+
+        tapak:
+        "1 tapak",
+
+        prisma: false,
+
+        criteria:
+        "✗ Hanya mempunyai 1 tapak<br>" +
+        "✗ Permukaan sisi bertemu pada satu bucu<br>" +
+        "✗ Bukan prisma"
+
+    }
+
+};
+
+
+// =====================================================
+// THREE.JS SETUP
+// =====================================================
 
 function setup3D() {
 
-    renderer = new THREE.WebGLRenderer({
+    renderer =
+    new THREE.WebGLRenderer({
+
         canvas: threeCanvas,
+
         alpha: true,
+
         antialias: true
+
     });
 
-    renderer.setPixelRatio(window.devicePixelRatio);
-    renderer.setSize(220, 220, false);
 
-    scene = new THREE.Scene();
-
-    camera3D = new THREE.PerspectiveCamera(
-        45,
-        1,
-        0.1,
-        100
+    renderer.setPixelRatio(
+        window.devicePixelRatio
     );
+
+
+    renderer.setSize(
+        240,
+        240,
+        false
+    );
+
+
+    scene =
+    new THREE.Scene();
+
+
+    camera3D =
+    new THREE.PerspectiveCamera(
+
+        45,
+
+        1,
+
+        0.1,
+
+        100
+
+    );
+
 
     camera3D.position.z = 5;
 
-    const light1 = new THREE.DirectionalLight(
+
+    const light =
+    new THREE.DirectionalLight(
         0xffffff,
         2
     );
 
-    light1.position.set(3, 4, 5);
 
-    scene.add(light1);
-
-    const light2 = new THREE.AmbientLight(
-        0xffffff,
-        1.2
+    light.position.set(
+        3,
+        4,
+        5
     );
 
-    scene.add(light2);
+
+    scene.add(light);
+
+
+    const ambient =
+    new THREE.AmbientLight(
+        0xffffff,
+        1.3
+    );
+
+
+    scene.add(ambient);
+
 
     animate3D();
+
 }
 
 
-// ==================================================
-// BUAT OBJEK 3D
-// ==================================================
+// =====================================================
+// BINA BENTUK 3D
+// =====================================================
 
 function create3DShape(shape) {
 
     if (!scene) return;
+
 
     if (object3D) {
 
@@ -238,116 +643,204 @@ function create3DShape(shape) {
 
     }
 
-    if (shape === "SILINDER") {
 
-        const geometry =
-            new THREE.CylinderGeometry(
-                1,
-                1,
-                2.2,
-                48
-            );
+    let geometry;
 
-        const material =
-            new THREE.MeshStandardMaterial({
-                color: 0x00d9ff,
-                transparent: true,
-                opacity: 0.78,
-                roughness: 0.25,
-                metalness: 0.1
-            });
-
-        object3D =
-            new THREE.Mesh(
-                geometry,
-                material
-            );
-
-    }
+    let material;
 
 
-    if (shape === "SFERA") {
+    material =
+    new THREE.MeshStandardMaterial({
 
-        const geometry =
-            new THREE.SphereGeometry(
-                1.25,
-                48,
-                32
-            );
+        color:
+        shape.includes("PRISMA")
+        ? 0x36a9e1
+        : shape === "SILINDER"
+        ? 0x42d6a4
+        : 0xffc83d,
 
-        const material =
-            new THREE.MeshStandardMaterial({
-                color: 0xffd43b,
-                transparent: true,
-                opacity: 0.8
-            });
+        transparent: true,
 
-        object3D =
-            new THREE.Mesh(
-                geometry,
-                material
-            );
+        opacity: 0.82,
+
+        roughness: 0.3
+
+    });
+
+
+    // PRISMA SEGI TIGA
+    if (
+        shape === "PRISMA SEGI TIGA"
+    ) {
+
+        geometry =
+        new THREE.CylinderGeometry(
+
+            1.2,
+
+            1.2,
+
+            2.2,
+
+            3
+
+        );
+
+        geometry.rotateY(
+            Math.PI / 2
+        );
 
     }
 
 
-    if (shape === "KUBOID") {
+    // PRISMA SEGI EMPAT SAMA
+    if (
+        shape === "PRISMA SEGI EMPAT SAMA"
+    ) {
 
-        const geometry =
-            new THREE.BoxGeometry(
-                2.2,
-                1.5,
-                1.5
-            );
+        geometry =
+        new THREE.BoxGeometry(
 
-        const material =
-            new THREE.MeshStandardMaterial({
-                color: 0xff66dd,
-                transparent: true,
-                opacity: 0.78
-            });
+            2,
 
-        object3D =
-            new THREE.Mesh(
-                geometry,
-                material
-            );
+            2,
+
+            2
+
+        );
 
     }
 
 
-    if (object3D) {
+    // PRISMA SEGI EMPAT TEPAT
+    if (
+        shape === "PRISMA SEGI EMPAT TEPAT"
+    ) {
 
-        scene.add(object3D);
+        geometry =
+        new THREE.BoxGeometry(
 
-        targetX = 0;
-        targetY = 0;
+            2.5,
 
-        object3D.rotation.x = 0;
-        object3D.rotation.y = 0;
+            1.5,
+
+            1.5
+
+        );
 
     }
+
+
+    // SILINDER
+    if (
+        shape === "SILINDER"
+    ) {
+
+        geometry =
+        new THREE.CylinderGeometry(
+
+            1,
+
+            1,
+
+            2.2,
+
+            48
+
+        );
+
+    }
+
+
+    // SFERA
+    if (
+        shape === "SFERA"
+    ) {
+
+        geometry =
+        new THREE.SphereGeometry(
+
+            1.25,
+
+            48,
+
+            32
+
+        );
+
+    }
+
+
+    // KON
+    if (
+        shape === "KON"
+    ) {
+
+        geometry =
+        new THREE.ConeGeometry(
+
+            1.2,
+
+            2.3,
+
+            48
+
+        );
+
+    }
+
+
+    if (!geometry) return;
+
+
+    object3D =
+    new THREE.Mesh(
+
+        geometry,
+
+        material
+
+    );
+
+
+    scene.add(object3D);
+
+
+    rotationX = 0;
+
+    rotationY = 0;
 
 }
 
 
-// ==================================================
-// ANIMASI 3D
-// ==================================================
+// =====================================================
+// ANIMASI
+// =====================================================
 
 function animate3D() {
 
-    requestAnimationFrame(animate3D);
+    requestAnimationFrame(
+        animate3D
+    );
+
 
     if (object3D) {
 
         object3D.rotation.x +=
-            (targetX - object3D.rotation.x) * 0.15;
+        (
+            rotationX -
+            object3D.rotation.x
+        ) * 0.15;
+
 
         object3D.rotation.y +=
-            (targetY - object3D.rotation.y) * 0.15;
+        (
+            rotationY -
+            object3D.rotation.y
+        ) * 0.15;
 
     }
+
 
     renderer.render(
         scene,
@@ -357,9 +850,9 @@ function animate3D() {
 }
 
 
-// ==================================================
-// PUTAR DENGAN JARI
-// ==================================================
+// =====================================================
+// PUTAR 3D DENGAN JARI
+// =====================================================
 
 threeCanvas.addEventListener(
     "pointerdown",
@@ -367,8 +860,11 @@ threeCanvas.addEventListener(
 
         dragging = true;
 
-        previousX = event.clientX;
-        previousY = event.clientY;
+        previousX =
+        event.clientX;
+
+        previousY =
+        event.clientY;
 
         threeCanvas.setPointerCapture(
             event.pointerId
@@ -384,18 +880,31 @@ threeCanvas.addEventListener(
 
         if (!dragging) return;
 
-        const movementX =
-            event.clientX - previousX;
 
-        const movementY =
-            event.clientY - previousY;
+        const dx =
+        event.clientX -
+        previousX;
 
-        targetY += movementX * 0.015;
 
-        targetX += movementY * 0.015;
+        const dy =
+        event.clientY -
+        previousY;
 
-        previousX = event.clientX;
-        previousY = event.clientY;
+
+        rotationY +=
+        dx * 0.015;
+
+
+        rotationX +=
+        dy * 0.015;
+
+
+        previousX =
+        event.clientX;
+
+
+        previousY =
+        event.clientY;
 
     }
 );
@@ -421,41 +930,68 @@ threeCanvas.addEventListener(
 );
 
 
-// ==================================================
+// =====================================================
+// RESET
+// =====================================================
+
+function resetRotation() {
+
+    rotationX = 0;
+
+    rotationY = 0;
+
+}
+
+
+// =====================================================
 // CAMERA
-// ==================================================
+// =====================================================
 
 async function startCamera() {
 
     try {
 
         const stream =
-            await navigator.mediaDevices.getUserMedia({
+        await navigator.mediaDevices
+        .getUserMedia({
 
-                video: {
-                    facingMode: {
-                        ideal: "environment"
-                    }
-                },
+            video: {
 
-                audio: false
+                facingMode: {
 
-            });
+                    ideal:
+                    "environment"
 
-        video.srcObject = stream;
+                }
+
+            },
+
+            audio: false
+
+        });
+
+
+        video.srcObject =
+        stream;
+
 
         await video.play();
 
-        resizeDetectionCanvas();
+
+        resizeCanvas();
+
 
         statusText.innerText =
-            "Memuatkan AI...";
+        "Memuatkan AI...";
+
 
         model =
-            await cocoSsd.load();
+        await cocoSsd.load();
+
 
         statusText.innerText =
-            "AI siap. Halakan kamera kepada objek.";
+        "AI sudah siap. Halakan kamera kepada objek.";
+
 
         detectObjects();
 
@@ -463,62 +999,76 @@ async function startCamera() {
 
     catch(error) {
 
-        statusText.innerText =
-            "Kamera tidak dapat dibuka.";
-
         console.error(error);
+
+
+        statusText.innerText =
+        "Kamera tidak dapat dibuka.";
 
     }
 
 }
 
 
-// ==================================================
-// CANVAS KAMERA
-// ==================================================
+// =====================================================
+// SAIZ CANVAS
+// =====================================================
 
-function resizeDetectionCanvas() {
+function resizeCanvas() {
 
     detectCanvas.width =
-        video.videoWidth;
+    video.videoWidth;
 
     detectCanvas.height =
-        video.videoHeight;
+    video.videoHeight;
 
 }
 
+
 video.addEventListener(
     "loadedmetadata",
-    resizeDetectionCanvas
+    resizeCanvas
 );
 
 
-// ==================================================
-// AI DETECTION
-// ==================================================
+// =====================================================
+// AI
+// =====================================================
 
 async function detectObjects() {
 
     if (!model) return;
 
+
     const predictions =
-        await model.detect(video);
+    await model.detect(video);
+
 
     detectCtx.clearRect(
+
         0,
+
         0,
+
         detectCanvas.width,
+
         detectCanvas.height
+
     );
 
 
-    if (predictions.length > 0) {
+    if (
+        predictions.length > 0
+    ) {
 
         const object =
-            predictions[0];
+        predictions[0];
+
 
         const shape =
-            getShape(object.class);
+        getShape(
+            object.class
+        );
 
 
         if (shape) {
@@ -527,10 +1077,11 @@ async function detectObjects() {
                 object.bbox
             );
 
+
             showShape(
-                shape,
-                object.score
+                shape
             );
+
 
             position3D(
                 object.bbox
@@ -540,6 +1091,7 @@ async function detectObjects() {
 
     }
 
+
     requestAnimationFrame(
         detectObjects
     );
@@ -547,17 +1099,26 @@ async function detectObjects() {
 }
 
 
-// ==================================================
-// TUKAR OBJEK KEPADA BENTUK
-// ==================================================
+// =====================================================
+// TENTUKAN BENTUK
+// =====================================================
 
 function getShape(object) {
 
+
+    // BOTOL / CAWAN
+    // → SILINDER
+
     if (
+
         object === "bottle" ||
+
         object === "cup" ||
+
         object === "wine glass" ||
+
         object === "vase"
+
     ) {
 
         return "SILINDER";
@@ -565,153 +1126,243 @@ function getShape(object) {
     }
 
 
-    if (object === "sports ball") {
+    // BOLA
+    // → SFERA
+
+    if (
+        object === "sports ball"
+    ) {
 
         return "SFERA";
 
     }
 
 
+    // BUKU
+    // → PRISMA SEGI EMPAT TEPAT
+
     if (
-        object === "book" ||
+        object === "book"
+    ) {
+
+        return "PRISMA SEGI EMPAT TEPAT";
+
+    }
+
+
+    // LAPTOP
+    // → PRISMA SEGI EMPAT TEPAT
+
+    if (
         object === "laptop" ||
+
         object === "keyboard" ||
+
         object === "cell phone" ||
+
         object === "remote"
     ) {
 
-        return "KUBOID";
+        return "PRISMA SEGI EMPAT TEPAT";
 
     }
+
 
     return null;
 
 }
 
 
-// ==================================================
+// =====================================================
 // PAPAR MAKLUMAT
-// ==================================================
+// =====================================================
 
-function showShape(shape, confidence) {
+function showShape(shape) {
+
+    const data =
+    shapeData[shape];
+
+
+    if (!data) return;
+
 
     shapeName.innerText =
-        "🔷 " + shape;
+    "🔷 " + shape;
 
 
-    if (shape === "SILINDER") {
+    if (data.prisma) {
 
-        sides.innerText = "3";
-        vertices.innerText = "0";
-        edges.innerText = "2";
+        prismaStatus.innerText =
+        "✅ PRISMA";
+
+
+        prismaStatus.style.color =
+        "#16803c";
+
+    }
+
+    else {
+
+        prismaStatus.innerText =
+        "❌ BUKAN PRISMA";
+
+
+        prismaStatus.style.color =
+        "#c62828";
 
     }
 
 
-    if (shape === "SFERA") {
-
-        sides.innerText = "1";
-        vertices.innerText = "0";
-        edges.innerText = "0";
-
-    }
+    flatSurfaces.innerText =
+    data.flat;
 
 
-    if (shape === "KUBOID") {
+    curvedSurfaces.innerText =
+    data.curved;
 
-        sides.innerText = "6";
-        vertices.innerText = "8";
-        edges.innerText = "12";
 
-    }
+    vertices.innerText =
+    data.vertices;
+
+
+    edges.innerText =
+    data.edges;
+
+
+    tapakInfo.innerHTML =
+    "<b>Tapak:</b> " +
+    data.tapak;
+
+
+    criteriaText.innerHTML =
+    data.criteria;
 
 
     instruction.innerText =
-        "👆 Sentuh dan tarik objek 3D untuk memutarkannya";
+    "👆 Sentuh model 3D dan tarik untuk memutarkannya";
 
-    if (currentShape !== shape) {
 
-        currentShape = shape;
+    if (
+        currentShape !== shape
+    ) {
 
-        create3DShape(shape);
+        currentShape =
+        shape;
+
+
+        create3DShape(
+            shape
+        );
 
     }
 
 }
 
 
-// ==================================================
-// KOTAK DETECTION
-// ==================================================
+// =====================================================
+// KOTAK AI
+// =====================================================
 
 function drawDetection(box) {
 
     const x = box[0];
+
     const y = box[1];
+
     const w = box[2];
+
     const h = box[3];
 
 
     detectCtx.strokeStyle =
-        "#00ff88";
+    "#00ff88";
 
-    detectCtx.lineWidth = 4;
+
+    detectCtx.lineWidth =
+    4;
+
 
     detectCtx.strokeRect(
+
         x,
+
         y,
+
         w,
+
         h
+
     );
 
 }
 
 
-// ==================================================
-// LETAK OBJEK 3D
-// ==================================================
+// =====================================================
+// LETAK MODEL 3D
+// =====================================================
 
 function position3D(box) {
 
     const x = box[0];
+
     const y = box[1];
 
     const w = box[2];
+
     const h = box[3];
 
 
     const centerX =
-        x + w / 2;
+    x + w / 2;
+
 
     const centerY =
-        y + h / 2;
+    y + h / 2;
+
+
+    const displayWidth =
+    video.clientWidth;
+
+
+    const displayHeight =
+    video.clientHeight;
 
 
     const scaleX =
-        threeCanvas.parentElement.clientWidth /
-        detectCanvas.width;
+    displayWidth /
+    detectCanvas.width;
+
 
     const scaleY =
-        threeCanvas.parentElement.clientHeight /
-        detectCanvas.height;
+    displayHeight /
+    detectCanvas.height;
 
 
     threeCanvas.style.left =
-        (centerX * scaleX - 110) + "px";
+
+    (
+        centerX * scaleX -
+        120
+    ) + "px";
+
 
     threeCanvas.style.top =
-        (centerY * scaleY - 110) + "px";
+
+    (
+        centerY * scaleY -
+        120
+    ) + "px";
 
 
     threeCanvas.style.display =
-        "block";
+    "block";
 
 }
 
 
-// ==================================================
-// MULAKAN
-// ==================================================
+// =====================================================
+// MULA
+// =====================================================
 
 setup3D();
 
