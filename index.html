@@ -1,79 +1,340 @@
 <!DOCTYPE html>
-<html>
+<html lang="ms">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Geometry AR</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <style>
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background: #eef6ff;
-      text-align: center;
-    }
+<title>Geometry AR - Kuboid</title>
 
-    h1 {
-      color: #174a7e;
-    }
+<style>
 
-    #scene {
-      width: 100%;
-      height: 400px;
-      background: #222;
-      display: block;
-    }
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: linear-gradient(135deg, #e3f2fd, #ffffff);
+    text-align: center;
+    color: #17324d;
+}
 
-    button {
-      padding: 15px 25px;
-      margin: 10px;
-      border: none;
-      border-radius: 10px;
-      background: #1976d2;
-      color: white;
-      font-size: 17px;
-      cursor: pointer;
-    }
+h1 {
+    margin-top: 25px;
+    color: #1565c0;
+}
 
-    #info {
-      background: white;
-      margin: 15px;
-      padding: 20px;
-      border-radius: 15px;
-    }
-  </style>
+.ar-area {
+    width: 90%;
+    max-width: 700px;
+    height: 430px;
+    margin: 20px auto;
+    background: #263238;
+    border-radius: 20px;
+    overflow: hidden;
+    position: relative;
+    perspective: 1000px;
+}
+
+.scene {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: grab;
+}
+
+.scene:active {
+    cursor: grabbing;
+}
+
+.cuboid {
+    width: 180px;
+    height: 120px;
+    position: relative;
+    transform-style: preserve-3d;
+    transform: rotateX(-15deg) rotateY(-25deg);
+}
+
+.face {
+    position: absolute;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border: 3px solid white;
+    font-size: 20px;
+    font-weight: bold;
+    color: white;
+    user-select: none;
+}
+
+.front, .back {
+    width: 180px;
+    height: 120px;
+}
+
+.front {
+    background: #2196f3;
+    transform: translateZ(90px);
+}
+
+.back {
+    background: #1976d2;
+    transform: rotateY(180deg) translateZ(90px);
+}
+
+.right, .left {
+    width: 180px;
+    height: 120px;
+}
+
+.right {
+    background: #42a5f5;
+    transform: rotateY(90deg) translateZ(90px);
+}
+
+.left {
+    background: #0d8bf2;
+    transform: rotateY(-90deg) translateZ(90px);
+}
+
+.top, .bottom {
+    width: 180px;
+    height: 180px;
+}
+
+.top {
+    background: #64b5f6;
+    transform: rotateX(90deg) translateZ(90px);
+}
+
+.bottom {
+    background: #1565c0;
+    transform: rotateX(-90deg) translateZ(30px);
+}
+
+button {
+    border: none;
+    background: #1976d2;
+    color: white;
+    padding: 14px 22px;
+    margin: 7px;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #0d47a1;
+}
+
+.info {
+    width: 90%;
+    max-width: 650px;
+    margin: 20px auto;
+    padding: 20px;
+    background: white;
+    border-radius: 18px;
+    box-shadow: 0 5px 15px #0002;
+}
+
+.info p {
+    font-size: 18px;
+}
+
+.quiz {
+    width: 90%;
+    max-width: 650px;
+    margin: 20px auto;
+    padding: 20px;
+    background: white;
+    border-radius: 18px;
+}
+
+.answer {
+    display: block;
+    width: 90%;
+    max-width: 400px;
+    margin: 10px auto;
+}
+
+#result {
+    font-size: 20px;
+    font-weight: bold;
+}
+
+</style>
 </head>
 
 <body>
 
-  <h1>📐 Geometry AR</h1>
+<h1>📐 GEOMETRY AR</h1>
 
-  <p>Kenali Bentuk Kuboid</p>
+<p>Kenali Bentuk 3D: <b>KUBOID</b></p>
 
-  <canvas id="scene"></canvas>
+<div class="ar-area">
 
-  <button onclick="tukarMaklumat()">👆 Tekan Kuboid</button>
+    <div class="scene" id="scene">
 
-  <div id="info">
-    <h2>📦 Kuboid</h2>
-    <p>Tekan butang untuk mengetahui maklumat.</p>
-  </div>
+        <div class="cuboid" id="cuboid">
 
-  <script>
+            <div class="face front">KUBOID</div>
+            <div class="face back">KUBOID</div>
+            <div class="face right">KUBOID</div>
+            <div class="face left">KUBOID</div>
+            <div class="face top">KUBOID</div>
+            <div class="face bottom">KUBOID</div>
 
-    function tukarMaklumat() {
+        </div>
 
-      document.getElementById("info").innerHTML = `
+    </div>
+
+</div>
+
+<p>👆 Seret kuboid untuk memusingkannya.</p>
+
+<button onclick="tunjukMaklumat()">
+    📐 Kenali Kuboid
+</button>
+
+<div class="info" id="info">
+
+    <h2>📦 Apakah bentuk ini?</h2>
+
+    <p>Tekan butang di atas untuk mengetahui maklumat.</p>
+
+</div>
+
+
+<div class="quiz">
+
+    <h2>📝 Kuiz Geometry</h2>
+
+    <h3>
+        Soalan 1: Berapakah bilangan sisi pada kuboid?
+    </h3>
+
+    <button class="answer" onclick="jawapan(4)">
+        A. 4
+    </button>
+
+    <button class="answer" onclick="jawapan(6)">
+        B. 6
+    </button>
+
+    <button class="answer" onclick="jawapan(8)">
+        C. 8
+    </button>
+
+    <button class="answer" onclick="jawapan(12)">
+        D. 12
+    </button>
+
+    <p id="result"></p>
+
+</div>
+
+
+<script>
+
+function tunjukMaklumat() {
+
+    document.getElementById("info").innerHTML = `
+
         <h2>📦 KUBOID</h2>
-        <p>🔵 Bilangan sisi: <b>6</b></p>
-        <p>🟢 Bilangan bucu: <b>8</b></p>
-        <p>🟠 Bilangan rusuk: <b>12</b></p>
-        <p>📐 Muka kuboid berbentuk segi empat tepat.</p>
-      `;
+
+        <p>🔵 <b>Nama bentuk:</b> Kuboid</p>
+
+        <p>🟢 <b>Bilangan sisi:</b> 6</p>
+
+        <p>🟡 <b>Bilangan bucu:</b> 8</p>
+
+        <p>🟠 <b>Bilangan rusuk:</b> 12</p>
+
+        <p>📐 <b>Bentuk sisi:</b> Segi empat tepat</p>
+
+    `;
+
+}
+
+
+function jawapan(nombor) {
+
+    let result = document.getElementById("result");
+
+    if (nombor === 6) {
+
+        result.innerHTML =
+        "🎉 BETUL! Kuboid mempunyai 6 sisi.";
+
+        result.style.color = "green";
+
+    } else {
+
+        result.innerHTML =
+        "❌ Belum betul. Cuba lagi!";
+
+        result.style.color = "red";
 
     }
 
-  </script>
+}
+
+
+/* FUNGSI PUSING KUBOID */
+
+let scene = document.getElementById("scene");
+let cuboid = document.getElementById("cuboid");
+
+let sedangGerak = false;
+let xLama = 0;
+let yLama = 0;
+
+let rotateX = -15;
+let rotateY = -25;
+
+
+scene.addEventListener("pointerdown", function(e) {
+
+    sedangGerak = true;
+
+    xLama = e.clientX;
+    yLama = e.clientY;
+
+});
+
+
+scene.addEventListener("pointermove", function(e) {
+
+    if (!sedangGerak) return;
+
+    let perubahanX = e.clientX - xLama;
+    let perubahanY = e.clientY - yLama;
+
+    rotateY += perubahanX * 0.6;
+    rotateX -= perubahanY * 0.6;
+
+    cuboid.style.transform =
+        "rotateX(" + rotateX + "deg) rotateY(" + rotateY + "deg)";
+
+    xLama = e.clientX;
+    yLama = e.clientY;
+
+});
+
+
+scene.addEventListener("pointerup", function() {
+
+    sedangGerak = false;
+
+});
+
+scene.addEventListener("pointerleave", function() {
+
+    sedangGerak = false;
+
+});
+
+</script>
 
 </body>
 </html>
