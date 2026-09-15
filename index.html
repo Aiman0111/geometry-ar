@@ -4,1050 +4,549 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>Geometry AI AR</title>
+<title>Geometry AR</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
 
 <style>
-
-body{
-    margin:0;
-    font-family:Arial,sans-serif;
-    background:#eef6ff;
-    color:#17324d;
-    text-align:center;
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #111;
+    color: white;
+    text-align: center;
 }
 
-.container{
-    width:95%;
-    max-width:800px;
-    margin:auto;
+h1 {
+    margin: 12px;
 }
 
-h1{
-    color:#1565c0;
+#cameraBox {
+    position: relative;
+    width: 95%;
+    max-width: 700px;
+    margin: auto;
+    overflow: hidden;
+    border-radius: 15px;
 }
 
-.camera{
-    position:relative;
-    width:100%;
-    background:#111;
-    border-radius:20px;
-    overflow:hidden;
+video {
+    width: 100%;
+    display: block;
 }
 
-#video{
-    width:100%;
-    display:block;
+canvas {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    touch-action: none;
 }
 
-#canvas{
-    position:absolute;
-    left:0;
-    top:0;
-    width:100%;
-    height:100%;
+#info {
+    margin: 15px auto;
+    width: 90%;
+    max-width: 600px;
+    padding: 15px;
+    background: #222;
+    border-radius: 12px;
 }
 
-button{
-    padding:13px 18px;
-    margin:6px;
-    border:0;
-    border-radius:12px;
-    background:#1976d2;
-    color:white;
-    font-size:16px;
-    font-weight:bold;
+button {
+    padding: 12px 20px;
+    margin: 5px;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+    cursor: pointer;
 }
-
-.info,.quiz{
-    background:white;
-    margin:20px 0;
-    padding:20px;
-    border-radius:18px;
-}
-
-.shape{
-    font-size:28px;
-    font-weight:bold;
-    color:#1565c0;
-}
-
-.stat{
-    font-size:18px;
-    margin:8px;
-}
-
-#status{
-    font-weight:bold;
-    margin:12px;
-}
-
 </style>
 </head>
 
 <body>
 
-<div class="container">
+<h1>📐 Geometry AR</h1>
 
-<h1>📐 GEOMETRY AI AR</h1>
-
-<p>Halakan kamera kepada objek.</p>
-
-<div id="status">
-🤖 Memuatkan AI...
+<div id="cameraBox">
+    <video id="video" autoplay playsinline></video>
+    <canvas id="canvas"></canvas>
 </div>
 
-<div class="camera">
-
-<video id="video"
-       autoplay
-       playsinline
-       muted></video>
-
-<canvas id="canvas"></canvas>
-
+<div id="info">
+    <h2 id="shapeName">Mencari objek...</h2>
+    <p id="instruction">
+        Halakan kamera kepada objek.
+    </p>
 </div>
 
-<button id="start">
-📷 MULA KAMERA
-</button>
-
-<div class="info">
-
-<h2>🔎 Bentuk Dikesan</h2>
-
-<div id="shape">
-Belum ada bentuk.
-</div>
-
-<div id="confidence"></div>
-
-<div id="geometry">
-Halakan kamera kepada objek.
-</div>
-
-</div>
-
-
-<div class="quiz">
-
-<h2>📝 KUIZ</h2>
-
-<div id="question">
-Soalan akan muncul apabila bentuk dikesan.
-</div>
-
-<div id="answers"></div>
-
-<div id="result"></div>
-
-</div>
-
-</div>
-
-
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0"></script>
-
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
-
+<button onclick="resetRotation()">🔄 Reset Putaran</button>
 
 <script>
 
-const video=
-document.getElementById("video");
+const video = document.getElementById("video");
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
 
-const canvas=
-document.getElementById("canvas");
+let model;
 
-const ctx=
-canvas.getContext("2d");
+let currentShape = null;
+let currentBox = null;
 
-const status=
-document.getElementById("status");
+let rotationX = 0;
+let rotationY = 0;
 
-let model=null;
-
-let running=false;
-
-let currentShape="";
+let dragging = false;
+let lastX = 0;
+let lastY = 0;
 
 
-/* =========================
-   LOAD AI
-========================= */
+// ===============================
+// CAMERA
+// ===============================
 
-async function loadAI(){
+async function startCamera() {
 
-    try{
+    try {
 
-        model=
-        await cocoSsd.load();
-
-        status.innerHTML=
-        "✅ AI bersedia. Tekan MULA KAMERA.";
-
-    }
-
-    catch(error){
-
-        status.innerHTML=
-        "❌ AI gagal dimuatkan.";
-
-        console.log(error);
-
-    }
-
-}
-
-loadAI();
-
-
-/* =========================
-   START CAMERA
-========================= */
-
-document
-.getElementById("start")
-.addEventListener("click",async()=>{
-
-    try{
-
-        const stream=
-        await navigator.mediaDevices
-        .getUserMedia({
-
-            video:{
-                facingMode:{
-                    ideal:"environment"
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+                facingMode: {
+                    ideal: "environment"
                 }
             },
-
-            audio:false
-
+            audio: false
         });
 
-        video.srcObject=stream;
+        video.srcObject = stream;
 
-        running=true;
+        await video.play();
 
-        status.innerHTML=
-        "📷 Kamera aktif.";
+        resizeCanvas();
 
-        video.onloadedmetadata=()=>{
+        model = await cocoSsd.load();
 
-            canvas.width=
-            video.videoWidth;
+        detectObjects();
 
-            canvas.height=
-            video.videoHeight;
+    } catch(error) {
 
-            detect();
-
-        };
+        alert("Kamera tidak dapat dibuka: " + error);
 
     }
-
-    catch(error){
-
-        status.innerHTML=
-        "❌ Kamera tidak dapat dibuka.";
-
-        console.log(error);
-
-    }
-
-});
-
-
-/* =========================
-   DETECTION
-========================= */
-
-async function detect(){
-
-    if(!model || !running){
-
-        requestAnimationFrame(detect);
-
-        return;
-
-    }
-
-
-    const predictions=
-    await model.detect(video);
-
-
-    ctx.clearRect(
-        0,
-        0,
-        canvas.width,
-        canvas.height
-    );
-
-
-    let best=null;
-
-
-    for(const p of predictions){
-
-        if(!best ||
-           p.score>best.score){
-
-            best=p;
-
-        }
-
-    }
-
-
-    if(best && best.score>0.45){
-
-        const object=
-        best.class;
-
-        const score=
-        best.score;
-
-        const shape=
-        getShape(object);
-
-
-        drawDetection(
-            best,
-            shape
-        );
-
-
-        if(shape){
-
-            showShape(
-                shape,
-                object,
-                score,
-                best.bbox
-            );
-
-        }
-
-        else{
-
-            document
-            .getElementById("shape")
-            .innerHTML=
-            "🤔 "+object;
-
-            document
-            .getElementById("confidence")
-            .innerHTML=
-            "Keyakinan: "+
-            Math.round(score*100)+"%";
-
-        }
-
-    }
-
-    else{
-
-        document
-        .getElementById("shape")
-        .innerHTML=
-        "🔍 Tiada objek.";
-
-        document
-        .getElementById("confidence")
-        .innerHTML="";
-
-        ctx.clearRect(
-            0,
-            0,
-            canvas.width,
-            canvas.height
-        );
-
-    }
-
-
-    requestAnimationFrame(detect);
 
 }
 
 
-/* =========================
-   OBJECT → SHAPE
-========================= */
+// ===============================
+// CANVAS
+// ===============================
 
-function getShape(object){
+function resizeCanvas() {
 
-    if(
-        object==="bottle" ||
-        object==="cup" ||
-        object==="wine glass" ||
-        object==="vase"
-    ){
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
 
-        return "silinder";
+}
+
+video.addEventListener("loadedmetadata", resizeCanvas);
+
+
+// ===============================
+// DETECT OBJECT
+// ===============================
+
+async function detectObjects() {
+
+    if (!model) return;
+
+    const predictions = await model.detect(video);
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (predictions.length > 0) {
+
+        const object = predictions[0];
+
+        const shape = getShape(object.class);
+
+        if (shape) {
+
+            currentShape = shape;
+            currentBox = object.bbox;
+
+            drawARShape(object.bbox, shape);
+
+            showInfo(shape, object.score);
+
+        }
 
     }
 
+    requestAnimationFrame(detectObjects);
 
-    if(
-        object==="sports ball"
-    ){
+}
 
-        return "sfera";
 
+// ===============================
+// TUKAR OBJEK → BENTUK GEOMETRI
+// ===============================
+
+function getShape(object) {
+
+    if (
+        object === "bottle" ||
+        object === "cup" ||
+        object === "wine glass" ||
+        object === "vase"
+    ) {
+        return "SILINDER";
     }
 
-
-    if(
-        object==="book" ||
-        object==="laptop" ||
-        object==="keyboard" ||
-        object==="cell phone" ||
-        object==="remote"
-    ){
-
-        return "kuboid";
-
+    if (object === "sports ball") {
+        return "SFERA";
     }
 
+    if (
+        object === "book" ||
+        object === "laptop" ||
+        object === "keyboard" ||
+        object === "cell phone" ||
+        object === "remote"
+    ) {
+        return "KUBOID";
+    }
 
     return null;
 
 }
 
 
-/* =========================
-   DRAW DETECTION
-========================= */
+// ===============================
+// MAKLUMAT BENTUK
+// ===============================
 
-function drawDetection(
-    prediction,
-    shape
-){
+function showInfo(shape, score) {
 
-    const x=
-    prediction.bbox[0];
+    document.getElementById("shapeName").innerText =
+        "Bentuk: " + shape;
 
-    const y=
-    prediction.bbox[1];
+    document.getElementById("instruction").innerText =
+        "👆 Tarik objek dengan jari untuk memutarkannya • Keyakinan: "
+        + Math.round(score * 100) + "%";
 
-    const w=
-    prediction.bbox[2];
-
-    const h=
-    prediction.bbox[3];
+}
 
 
-    ctx.strokeStyle=
-    "#00ff88";
+// ===============================
+// LUKIS OBJEK
+// ===============================
 
-    ctx.lineWidth=4;
+function drawARShape(box, shape) {
 
-    ctx.strokeRect(
-        x,
-        y,
-        w,
-        h
-    );
+    const x = box[0];
+    const y = box[1];
 
+    const w = box[2];
+    const h = box[3];
 
-    ctx.fillStyle=
-    "#00ff88";
+    const cx = x + w / 2;
+    const cy = y + h / 2;
 
-    ctx.font=
-    "bold 18px Arial";
+    // bounding box
+    ctx.strokeStyle = "#00ff88";
+    ctx.lineWidth = 3;
 
-    ctx.fillText(
-        prediction.class,
-        x,
-        Math.max(22,y-7)
-    );
+    ctx.strokeRect(x, y, w, h);
 
+    // objek
+    if (shape === "SILINDER") {
 
-    /* MODEL 3D */
+        drawCylinder(cx, cy, Math.min(w,h) / 3, h / 2);
 
-    if(shape){
+    }
 
-        draw3DShape(
-            shape,
-            x,
-            y,
-            w,
-            h
-        );
+    if (shape === "SFERA") {
+
+        drawSphere(cx, cy, Math.min(w,h) / 3);
+
+    }
+
+    if (shape === "KUBOID") {
+
+        drawCuboid(cx, cy, Math.min(w,h) / 2);
 
     }
 
 }
 
 
-/* =========================
-   3D SHAPE
-========================= */
+// ===============================
+// SILINDER
+// ===============================
 
-function draw3DShape(
-    shape,
-    x,
-    y,
-    w,
-    h
-){
+function drawCylinder(cx, cy, radius, height) {
 
-    const cx=
-    x+w/2;
+    ctx.save();
 
-    const cy=
-    y+h/2;
+    ctx.translate(cx, cy);
 
+    ctx.rotate(rotationY * Math.PI / 180);
 
-    if(shape==="silinder"){
+    ctx.strokeStyle = "#00ffff";
+    ctx.lineWidth = 5;
 
-        drawCylinder(
-            cx,
-            cy,
-            Math.min(w,h)*0.32,
-            h*0.8
-        );
+    const ry = radius * 0.35;
 
-    }
-
-
-    if(shape==="sfera"){
-
-        drawSphere(
-            cx,
-            cy,
-            Math.min(w,h)*0.38
-        );
-
-    }
-
-
-    if(shape==="kuboid"){
-
-        drawCuboid(
-            cx,
-            cy,
-            Math.min(w,h)*0.35
-        );
-
-    }
-
-}
-
-
-/* =========================
-   CYLINDER
-========================= */
-
-function drawCylinder(
-    cx,
-    cy,
-    radius,
-    height
-){
-
-    const top=
-    cy-height/2;
-
-    const bottom=
-    cy+height/2;
-
-
-    ctx.fillStyle=
-    "rgba(0,180,255,0.35)";
-
-    ctx.strokeStyle=
-    "#00ffff";
-
-    ctx.lineWidth=4;
-
-
+    // atas
     ctx.beginPath();
 
     ctx.ellipse(
-        cx,
-        top,
+        0,
+        -height / 2,
         radius,
-        radius*0.32,
+        ry,
+        rotationX * Math.PI / 180,
         0,
-        0,
-        Math.PI*2
+        Math.PI * 2
     );
-
-    ctx.fill();
 
     ctx.stroke();
 
 
-    ctx.fillRect(
-        cx-radius,
-        top,
-        radius*2,
-        height
-    );
-
-
+    // badan
     ctx.beginPath();
 
-    ctx.moveTo(
-        cx-radius,
-        top
-    );
+    ctx.moveTo(-radius, -height / 2);
+    ctx.lineTo(-radius, height / 2);
 
-    ctx.lineTo(
-        cx-radius,
-        bottom
-    );
-
-    ctx.moveTo(
-        cx+radius,
-        top
-    );
-
-    ctx.lineTo(
-        cx+radius,
-        bottom
-    );
+    ctx.moveTo(radius, -height / 2);
+    ctx.lineTo(radius, height / 2);
 
     ctx.stroke();
 
 
+    // bawah
     ctx.beginPath();
 
     ctx.ellipse(
-        cx,
-        bottom,
+        0,
+        height / 2,
         radius,
-        radius*0.32,
+        ry,
+        rotationX * Math.PI / 180,
         0,
-        0,
-        Math.PI*2
+        Math.PI * 2
     );
 
     ctx.stroke();
 
-
-    ctx.fillStyle="white";
-
-    ctx.font=
-    "bold 18px Arial";
-
-    ctx.textAlign="center";
-
-    ctx.fillText(
-        "SILINDER",
-        cx,
-        cy+7
-    );
+    ctx.restore();
 
 }
 
 
-/* =========================
-   SPHERE
-========================= */
+// ===============================
+// SFERA
+// ===============================
 
-function drawSphere(
-    cx,
-    cy,
-    radius
-){
+function drawSphere(cx, cy, radius) {
 
-    const gradient=
-    ctx.createRadialGradient(
-        cx-radius*0.35,
-        cy-radius*0.35,
-        5,
-        cx,
-        cy,
-        radius
-    );
+    ctx.save();
 
+    ctx.translate(cx, cy);
 
-    gradient.addColorStop(
-        0,
-        "rgba(255,255,255,0.8)"
-    );
+    ctx.rotate(rotationY * Math.PI / 180);
 
-    gradient.addColorStop(
-        1,
-        "rgba(0,150,255,0.45)"
-    );
-
-
-    ctx.fillStyle=
-    gradient;
-
-    ctx.strokeStyle=
-    "#00ffff";
-
-    ctx.lineWidth=4;
-
+    ctx.strokeStyle = "#ffff00";
+    ctx.lineWidth = 4;
 
     ctx.beginPath();
 
     ctx.arc(
-        cx,
-        cy,
+        0,
+        0,
         radius,
         0,
-        Math.PI*2
+        Math.PI * 2
     );
-
-    ctx.fill();
 
     ctx.stroke();
 
 
-    ctx.fillStyle="white";
-
-    ctx.font=
-    "bold 18px Arial";
-
-    ctx.textAlign="center";
-
-    ctx.fillText(
-        "SFERA",
-        cx,
-        cy+7
-    );
-
-}
-
-
-/* =========================
-   CUBOID
-========================= */
-
-function drawCuboid(
-    cx,
-    cy,
-    size
-){
-
-    const offset=
-    size*0.45;
-
-
-    ctx.fillStyle=
-    "rgba(0,150,255,0.35)";
-
-    ctx.strokeStyle=
-    "#00ffff";
-
-    ctx.lineWidth=4;
-
-
+    // garisan melintang
     ctx.beginPath();
 
-    ctx.rect(
-        cx-size,
-        cy-size,
-        size*2,
-        size*1.5
+    ctx.ellipse(
+        0,
+        0,
+        radius,
+        radius * 0.35,
+        rotationX * Math.PI / 180,
+        0,
+        Math.PI * 2
     );
-
-    ctx.fill();
 
     ctx.stroke();
 
 
+    // garisan menegak
     ctx.beginPath();
 
-    ctx.moveTo(
-        cx-size,
-        cy-size
-    );
-
-    ctx.lineTo(
-        cx-size+offset,
-        cy-size-offset
-    );
-
-    ctx.lineTo(
-        cx+size+offset,
-        cy-size-offset
-    );
-
-    ctx.lineTo(
-        cx+size,
-        cy-size
+    ctx.ellipse(
+        0,
+        0,
+        radius * 0.35,
+        radius,
+        rotationY * Math.PI / 180,
+        0,
+        Math.PI * 2
     );
 
     ctx.stroke();
 
+    ctx.restore();
 
+}
+
+
+// ===============================
+// KUBOID
+// ===============================
+
+function drawCuboid(cx, cy, size) {
+
+    ctx.save();
+
+    ctx.translate(cx, cy);
+
+    const angleX = rotationX * Math.PI / 180;
+    const angleY = rotationY * Math.PI / 180;
+
+    ctx.strokeStyle = "#ff66ff";
+    ctx.lineWidth = 5;
+
+    const depth = size * 0.35;
+
+    // depan
+    ctx.strokeRect(
+        -size / 2,
+        -size / 2,
+        size,
+        size
+    );
+
+
+    // belakang
+    ctx.strokeRect(
+        -size / 2 + depth * Math.cos(angleY),
+        -size / 2 + depth * Math.sin(angleX),
+        size,
+        size
+    );
+
+
+    // sambungan
     ctx.beginPath();
 
-    ctx.moveTo(
-        cx+size,
-        cy-size
-    );
+    ctx.moveTo(-size/2, -size/2);
 
     ctx.lineTo(
-        cx+size+offset,
-        cy-size-offset
+        -size/2 + depth * Math.cos(angleY),
+        -size/2 + depth * Math.sin(angleX)
     );
 
-    ctx.lineTo(
-        cx+size+offset,
-        cy+size*0.5-offset
-    );
+    ctx.moveTo(size/2, -size/2);
 
     ctx.lineTo(
-        cx+size,
-        cy+size*0.5
+        size/2 + depth * Math.cos(angleY),
+        -size/2 + depth * Math.sin(angleX)
+    );
+
+    ctx.moveTo(-size/2, size/2);
+
+    ctx.lineTo(
+        -size/2 + depth * Math.cos(angleY),
+        size/2 + depth * Math.sin(angleX)
+    );
+
+    ctx.moveTo(size/2, size/2);
+
+    ctx.lineTo(
+        size/2 + depth * Math.cos(angleY),
+        size/2 + depth * Math.sin(angleX)
     );
 
     ctx.stroke();
 
-
-    ctx.fillStyle="white";
-
-    ctx.font=
-    "bold 18px Arial";
-
-    ctx.textAlign="center";
-
-    ctx.fillText(
-        "KUBOID",
-        cx,
-        cy
-    );
+    ctx.restore();
 
 }
 
 
-/* =========================
-   INFO
-========================= */
+// ===============================
+// PUTAR DENGAN JARI
+// ===============================
 
-function showShape(
-    shape,
-    object,
-    score,
-    bbox
-){
+canvas.addEventListener("pointerdown", function(e) {
 
-    let name="";
-    let emoji="";
-    let sides="";
-    let vertices="";
-    let edges="";
+    if (!currentBox) return;
+
+    dragging = true;
+
+    lastX = e.clientX;
+    lastY = e.clientY;
+
+});
 
 
-    if(shape==="silinder"){
+canvas.addEventListener("pointermove", function(e) {
 
-        name="SILINDER";
+    if (!dragging) return;
 
-        emoji="🥫";
+    const dx = e.clientX - lastX;
+    const dy = e.clientY - lastY;
 
-        sides="3";
+    rotationY += dx * 0.8;
+    rotationX += dy * 0.8;
 
-        vertices="0";
+    lastX = e.clientX;
+    lastY = e.clientY;
 
-        edges="2";
-
-    }
-
-
-    if(shape==="sfera"){
-
-        name="SFERA";
-
-        emoji="⚽";
-
-        sides="1";
-
-        vertices="0";
-
-        edges="0";
-
-    }
+});
 
 
-    if(shape==="kuboid"){
+canvas.addEventListener("pointerup", function() {
 
-        name="KUBOID";
+    dragging = false;
 
-        emoji="📦";
-
-        sides="6";
-
-        vertices="8";
-
-        edges="12";
-
-    }
+});
 
 
-    document
-    .getElementById("shape")
-    .innerHTML=
-    `<div class="shape">
-    ${emoji} ${name}
-    </div>`;
+canvas.addEventListener("pointercancel", function() {
+
+    dragging = false;
+
+});
 
 
-    document
-    .getElementById("confidence")
-    .innerHTML=
-    `AI mengesan <b>${object}</b> —
-    ${Math.round(score*100)}%`;
+// ===============================
+// RESET
+// ===============================
 
+function resetRotation() {
 
-    document
-    .getElementById("geometry")
-    .innerHTML=`
-
-    <div class="stat">
-    🔵 Sisi: <b>${sides}</b>
-    </div>
-
-    <div class="stat">
-    🟢 Bucu: <b>${vertices}</b>
-    </div>
-
-    <div class="stat">
-    🟠 Rusuk: <b>${edges}</b>
-    </div>
-
-    `;
-
-
-    if(currentShape!==shape){
-
-        currentShape=shape;
-
-        createQuiz(shape);
-
-    }
+    rotationX = 0;
+    rotationY = 0;
 
 }
 
 
-/* =========================
-   QUIZ
-========================= */
+// ===============================
+// START
+// ===============================
 
-function createQuiz(shape){
-
-    const question=
-    document.getElementById(
-        "question"
-    );
-
-    const answers=
-    document.getElementById(
-        "answers"
-    );
-
-
-    if(shape==="silinder"){
-
-        question.innerHTML=
-        "🥫 Berapakah bilangan bucu silinder?";
-
-        answers.innerHTML=`
-
-        <button onclick="check(true)">
-        A. 0
-        </button>
-
-        <button onclick="check(false)">
-        B. 2
-        </button>
-
-        <button onclick="check(false)">
-        C. 4
-        </button>
-
-        `;
-
-    }
-
-
-    if(shape==="sfera"){
-
-        question.innerHTML=
-        "⚽ Berapakah bilangan bucu sfera?";
-
-        answers.innerHTML=`
-
-        <button onclick="check(true)">
-        A. 0
-        </button>
-
-        <button onclick="check(false)">
-        B. 2
-        </button>
-
-        `;
-
-    }
-
-
-    if(shape==="kuboid"){
-
-        question.innerHTML=
-        "📦 Berapakah bilangan sisi kuboid?";
-
-        answers.innerHTML=`
-
-        <button onclick="check(false)">
-        A. 4
-        </button>
-
-        <button onclick="check(true)">
-        B. 6
-        </button>
-
-        <button onclick="check(false)">
-        C. 8
-        </button>
-
-        <button onclick="check(false)">
-        D. 12
-        </button>
-
-        `;
-
-    }
-
-}
-
-
-function check(correct){
-
-    const result=
-    document.getElementById(
-        "result"
-    );
-
-
-    if(correct){
-
-        result.innerHTML=
-        "🎉 BETUL!";
-
-        result.style.color=
-        "green";
-
-    }
-
-    else{
-
-        result.innerHTML=
-        "❌ Salah. Cuba lagi.";
-
-        result.style.color=
-        "red";
-
-    }
-
-}
+startCamera();
 
 </script>
 
