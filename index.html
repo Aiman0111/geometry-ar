@@ -4,335 +4,272 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>Geometry AR - Kuboid</title>
+<title>Geometry AI AR</title>
 
 <style>
-
 body {
     margin: 0;
     font-family: Arial, sans-serif;
-    background: linear-gradient(135deg, #e3f2fd, #ffffff);
-    text-align: center;
+    background: #eef6ff;
     color: #17324d;
+    text-align: center;
 }
 
 h1 {
-    margin-top: 25px;
     color: #1565c0;
 }
 
-.ar-area {
-    width: 90%;
-    max-width: 700px;
-    height: 430px;
-    margin: 20px auto;
-    background: #263238;
-    border-radius: 20px;
-    overflow: hidden;
-    position: relative;
-    perspective: 1000px;
-}
-
-.scene {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    cursor: grab;
-}
-
-.scene:active {
-    cursor: grabbing;
-}
-
-.cuboid {
-    width: 180px;
-    height: 120px;
-    position: relative;
-    transform-style: preserve-3d;
-    transform: rotateX(-15deg) rotateY(-25deg);
-}
-
-.face {
-    position: absolute;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    border: 3px solid white;
-    font-size: 20px;
-    font-weight: bold;
-    color: white;
-    user-select: none;
-}
-
-.front, .back {
-    width: 180px;
-    height: 120px;
-}
-
-.front {
-    background: #2196f3;
-    transform: translateZ(90px);
-}
-
-.back {
-    background: #1976d2;
-    transform: rotateY(180deg) translateZ(90px);
-}
-
-.right, .left {
-    width: 180px;
-    height: 120px;
-}
-
-.right {
-    background: #42a5f5;
-    transform: rotateY(90deg) translateZ(90px);
-}
-
-.left {
-    background: #0d8bf2;
-    transform: rotateY(-90deg) translateZ(90px);
-}
-
-.top, .bottom {
-    width: 180px;
-    height: 180px;
-}
-
-.top {
-    background: #64b5f6;
-    transform: rotateX(90deg) translateZ(90px);
-}
-
-.bottom {
-    background: #1565c0;
-    transform: rotateX(-90deg) translateZ(30px);
-}
-
 button {
-    border: none;
+    padding: 14px 20px;
+    margin: 7px;
+    border: 0;
+    border-radius: 12px;
     background: #1976d2;
     color: white;
-    padding: 14px 22px;
-    margin: 7px;
-    border-radius: 12px;
     font-size: 16px;
     font-weight: bold;
-    cursor: pointer;
 }
 
-button:hover {
-    background: #0d47a1;
+.camera {
+    width: 95%;
+    max-width: 700px;
+    margin: auto;
+    background: #111;
+    border-radius: 20px;
+    overflow: hidden;
+}
+
+video {
+    width: 100%;
+    display: block;
 }
 
 .info {
+    background: white;
     width: 90%;
-    max-width: 650px;
+    max-width: 600px;
     margin: 20px auto;
     padding: 20px;
-    background: white;
     border-radius: 18px;
-    box-shadow: 0 5px 15px #0002;
 }
 
-.info p {
-    font-size: 18px;
+select {
+    padding: 12px;
+    font-size: 16px;
+    border-radius: 10px;
 }
 
 .quiz {
+    background: white;
     width: 90%;
-    max-width: 650px;
+    max-width: 600px;
     margin: 20px auto;
     padding: 20px;
-    background: white;
     border-radius: 18px;
 }
-
-.answer {
-    display: block;
-    width: 90%;
-    max-width: 400px;
-    margin: 10px auto;
-}
-
-#result {
-    font-size: 20px;
-    font-weight: bold;
-}
-
 </style>
 </head>
 
 <body>
 
-<h1>📐 GEOMETRY AR</h1>
+<h1>📐 GEOMETRY AI AR</h1>
 
-<p>Kenali Bentuk 3D: <b>KUBOID</b></p>
+<p>Halakan kamera kepada objek di sekeliling anda.</p>
 
-<div class="ar-area">
+<div class="camera">
 
-    <div class="scene" id="scene">
+    <video id="camera" autoplay playsinline></video>
 
-        <div class="cuboid" id="cuboid">
+</div>
 
-            <div class="face front">KUBOID</div>
-            <div class="face back">KUBOID</div>
-            <div class="face right">KUBOID</div>
-            <div class="face left">KUBOID</div>
-            <div class="face top">KUBOID</div>
-            <div class="face bottom">KUBOID</div>
+<button id="startCamera">
+📷 Mula Kamera
+</button>
 
-        </div>
+<div class="info">
+
+    <h2>🔎 Bentuk Dikesan</h2>
+
+    <select id="shape">
+
+        <option value="kuboid">📦 Kuboid</option>
+        <option value="kubus">🧊 Kubus</option>
+        <option value="silinder">🥫 Silinder</option>
+        <option value="sfera">⚽ Sfera</option>
+        <option value="piramid">🔺 Piramid</option>
+
+    </select>
+
+    <button onclick="showInfo()">
+        Lihat Maklumat
+    </button>
+
+    <div id="result">
+
+        <p>Pilih bentuk untuk melihat maklumat.</p>
 
     </div>
 
 </div>
 
-<p>👆 Seret kuboid untuk memusingkannya.</p>
-
-<button onclick="tunjukMaklumat()">
-    📐 Kenali Kuboid
-</button>
-
-<div class="info" id="info">
-
-    <h2>📦 Apakah bentuk ini?</h2>
-
-    <p>Tekan butang di atas untuk mengetahui maklumat.</p>
-
-</div>
-
-
 <div class="quiz">
 
-    <h2>📝 Kuiz Geometry</h2>
+    <h2>📝 Kuiz</h2>
 
-    <h3>
-        Soalan 1: Berapakah bilangan sisi pada kuboid?
-    </h3>
+    <p>
+        Apakah bentuk 3D yang mempunyai
+        <b>6 sisi, 8 bucu dan 12 rusuk</b>?
+    </p>
 
-    <button class="answer" onclick="jawapan(4)">
-        A. 4
+    <button onclick="answer(false)">
+        A. Silinder
     </button>
 
-    <button class="answer" onclick="jawapan(6)">
-        B. 6
+    <button onclick="answer(true)">
+        B. Kuboid
     </button>
 
-    <button class="answer" onclick="jawapan(8)">
-        C. 8
+    <button onclick="answer(false)">
+        C. Sfera
     </button>
 
-    <button class="answer" onclick="jawapan(12)">
-        D. 12
+    <button onclick="answer(false)">
+        D. Piramid
     </button>
 
-    <p id="result"></p>
+    <p id="quizResult"></p>
 
 </div>
-
 
 <script>
 
-function tunjukMaklumat() {
+const video = document.getElementById("camera");
 
-    document.getElementById("info").innerHTML = `
+document.getElementById("startCamera")
+.addEventListener("click", async function() {
 
+    try {
+
+        const stream =
+        await navigator.mediaDevices.getUserMedia({
+            video: {
+                facingMode: {
+                    ideal: "environment"
+                }
+            },
+            audio: false
+        });
+
+        video.srcObject = stream;
+
+    } catch (error) {
+
+        alert(
+            "Kamera tidak dapat dibuka. Pastikan anda menggunakan HTTPS dan benarkan akses kamera."
+        );
+
+    }
+
+});
+
+
+function showInfo() {
+
+    const shape =
+    document.getElementById("shape").value;
+
+    const result =
+    document.getElementById("result");
+
+    let html = "";
+
+    if (shape === "kuboid") {
+
+        html = `
         <h2>📦 KUBOID</h2>
+        <p>🔵 Sisi: <b>6</b></p>
+        <p>🟢 Bucu: <b>8</b></p>
+        <p>🟠 Rusuk: <b>12</b></p>
+        <p>Setiap muka berbentuk segi empat tepat.</p>
+        `;
 
-        <p>🔵 <b>Nama bentuk:</b> Kuboid</p>
+    }
 
-        <p>🟢 <b>Bilangan sisi:</b> 6</p>
+    if (shape === "kubus") {
 
-        <p>🟡 <b>Bilangan bucu:</b> 8</p>
+        html = `
+        <h2>🧊 KUBUS</h2>
+        <p>🔵 Sisi: <b>6</b></p>
+        <p>🟢 Bucu: <b>8</b></p>
+        <p>🟠 Rusuk: <b>12</b></p>
+        <p>Semua sisinya berbentuk segi empat sama.</p>
+        `;
 
-        <p>🟠 <b>Bilangan rusuk:</b> 12</p>
+    }
 
-        <p>📐 <b>Bentuk sisi:</b> Segi empat tepat</p>
+    if (shape === "silinder") {
 
-    `;
+        html = `
+        <h2>🥫 SILINDER</h2>
+        <p>🔵 Sisi: <b>3</b></p>
+        <p>🟢 Bucu: <b>0</b></p>
+        <p>🟠 Rusuk: <b>2</b></p>
+        <p>Mempunyai dua permukaan bulat.</p>
+        `;
+
+    }
+
+    if (shape === "sfera") {
+
+        html = `
+        <h2>⚽ SFERA</h2>
+        <p>🔵 Sisi: <b>1</b></p>
+        <p>🟢 Bucu: <b>0</b></p>
+        <p>🟠 Rusuk: <b>0</b></p>
+        <p>Permukaannya melengkung.</p>
+        `;
+
+    }
+
+    if (shape === "piramid") {
+
+        html = `
+        <h2>🔺 PIRAMID</h2>
+        <p>🔵 Sisi: <b>5</b></p>
+        <p>🟢 Bucu: <b>5</b></p>
+        <p>🟠 Rusuk: <b>8</b></p>
+        <p>Mempunyai satu tapak dan sisi berbentuk segi tiga.</p>
+        `;
+
+    }
+
+    result.innerHTML = html;
 
 }
 
 
-function jawapan(nombor) {
+function answer(correct) {
 
-    let result = document.getElementById("result");
+    const output =
+    document.getElementById("quizResult");
 
-    if (nombor === 6) {
+    if (correct) {
 
-        result.innerHTML =
-        "🎉 BETUL! Kuboid mempunyai 6 sisi.";
+        output.innerHTML =
+        "🎉 Betul! Jawapannya ialah KUBOID.";
 
-        result.style.color = "green";
+        output.style.color = "green";
 
     } else {
 
-        result.innerHTML =
-        "❌ Belum betul. Cuba lagi!";
+        output.innerHTML =
+        "❌ Cuba lagi.";
 
-        result.style.color = "red";
+        output.style.color = "red";
 
     }
 
 }
-
-
-/* FUNGSI PUSING KUBOID */
-
-let scene = document.getElementById("scene");
-let cuboid = document.getElementById("cuboid");
-
-let sedangGerak = false;
-let xLama = 0;
-let yLama = 0;
-
-let rotateX = -15;
-let rotateY = -25;
-
-
-scene.addEventListener("pointerdown", function(e) {
-
-    sedangGerak = true;
-
-    xLama = e.clientX;
-    yLama = e.clientY;
-
-});
-
-
-scene.addEventListener("pointermove", function(e) {
-
-    if (!sedangGerak) return;
-
-    let perubahanX = e.clientX - xLama;
-    let perubahanY = e.clientY - yLama;
-
-    rotateY += perubahanX * 0.6;
-    rotateX -= perubahanY * 0.6;
-
-    cuboid.style.transform =
-        "rotateX(" + rotateX + "deg) rotateY(" + rotateY + "deg)";
-
-    xLama = e.clientX;
-    yLama = e.clientY;
-
-});
-
-
-scene.addEventListener("pointerup", function() {
-
-    sedangGerak = false;
-
-});
-
-scene.addEventListener("pointerleave", function() {
-
-    sedangGerak = false;
-
-});
 
 </script>
 
