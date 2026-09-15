@@ -3,8 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<title>Geometry AR - Kuboid</title>
+<title>Geometry AI</title>
 
 <style>
 body{
@@ -15,89 +14,93 @@ body{
     text-align:center;
 }
 
+.container{
+    width:95%;
+    max-width:750px;
+    margin:auto;
+}
+
 h1{
     color:#1565c0;
 }
 
-#cameraBox{
+.camera{
     position:relative;
-    width:95%;
-    max-width:700px;
-    margin:auto;
+    width:100%;
     background:#111;
-    border-radius:20px;
+    border-radius:18px;
     overflow:hidden;
 }
 
-#video{
+video{
     width:100%;
     display:block;
 }
 
-#arCanvas{
+#detectCanvas{
     position:absolute;
     left:0;
     top:0;
     width:100%;
     height:100%;
-    pointer-events:none;
 }
 
 button{
-    padding:14px 20px;
-    margin:8px;
     border:0;
     border-radius:12px;
+    padding:14px 20px;
+    margin:8px;
     background:#1976d2;
     color:white;
     font-size:16px;
     font-weight:bold;
 }
 
-button:active{
-    transform:scale(.97);
-}
-
-.info{
-    width:90%;
-    max-width:600px;
-    margin:20px auto;
-    padding:20px;
+.info,.quiz{
     background:white;
+    margin:20px 0;
+    padding:20px;
     border-radius:18px;
 }
 
-.big{
-    font-size:24px;
+.detected{
+    font-size:25px;
     font-weight:bold;
     color:#1565c0;
 }
 
-.quiz{
-    width:90%;
-    max-width:600px;
-    margin:20px auto;
-    padding:20px;
-    background:white;
-    border-radius:18px;
+.stat{
+    font-size:18px;
+    margin:8px;
+}
+
+#status{
+    font-weight:bold;
+    margin:12px;
 }
 </style>
 </head>
 
 <body>
 
-<h1>📐 GEOMETRY AR</h1>
+<div class="container">
 
-<p>📦 Kenali Kuboid</p>
+<h1>📐 GEOMETRY AI</h1>
 
-<div id="cameraBox">
+<p>Halakan kamera kepada objek di sekeliling anda.</p>
 
-    <video id="video"
-           autoplay
-           playsinline
-           muted></video>
+<div id="status">
+🤖 Memuatkan AI...
+</div>
 
-    <canvas id="arCanvas"></canvas>
+<div class="camera">
+
+<video id="video"
+       autoplay
+       playsinline
+       muted></video>
+
+<canvas id="detectCanvas"></canvas>
 
 </div>
 
@@ -105,53 +108,50 @@ button:active{
 📷 MULA KAMERA
 </button>
 
-<button id="showCube">
-📦 PAPAR KUBOID 3D
-</button>
 
 <div class="info">
 
-    <h2>🔎 Bentuk Dikesan</h2>
+<h2>🔎 Bentuk Dikesan</h2>
 
-    <div id="shape">
-        Belum dikesan
-    </div>
+<div id="detected">
+Belum ada objek.
+</div>
 
-    <div id="details">
-        Halakan kamera kepada objek berbentuk kotak.
-    </div>
+<div id="confidence"></div>
+
+<hr>
+
+<div id="geometry">
+Halakan kamera kepada objek.
+</div>
 
 </div>
 
 
 <div class="quiz">
 
-<h2>📝 SOALAN</h2>
+<h2>📝 Kuiz Geometry</h2>
 
-<p>
-<b>Soalan 1:</b><br>
-Berapakah bilangan sisi pada kuboid?
-</p>
+<div id="question">
 
-<button onclick="answer(4)">
-A. 4
-</button>
-
-<button onclick="answer(6)">
-B. 6
-</button>
-
-<button onclick="answer(8)">
-C. 8
-</button>
-
-<button onclick="answer(12)">
-D. 12
-</button>
-
-<h3 id="result"></h3>
+Soalan akan muncul selepas bentuk dikesan.
 
 </div>
+
+<div id="answers"></div>
+
+<div id="quizResult"></div>
+
+</div>
+
+</div>
+
+
+<!-- AI -->
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
 
 
 <script>
@@ -160,25 +160,71 @@ const video =
 document.getElementById("video");
 
 const canvas =
-document.getElementById("arCanvas");
+document.getElementById("detectCanvas");
 
 const ctx =
 canvas.getContext("2d");
 
+const status =
+document.getElementById("status");
+
+const detected =
+document.getElementById("detected");
+
+const confidence =
+document.getElementById("confidence");
+
+const geometry =
+document.getElementById("geometry");
+
+let model=null;
+
+let running=false;
+
+let lastShape="";
+
 
 /* =========================
-   KAMERA
+   LOAD AI
+========================= */
+
+async function loadAI(){
+
+    try{
+
+        model=await cocoSsd.load();
+
+        status.innerHTML=
+        "✅ AI sudah bersedia. Tekan MULA KAMERA.";
+
+    }
+
+    catch(error){
+
+        status.innerHTML=
+        "❌ AI gagal dimuatkan.";
+
+        console.log(error);
+
+    }
+
+}
+
+loadAI();
+
+
+/* =========================
+   CAMERA
 ========================= */
 
 document
 .getElementById("startCamera")
-.addEventListener("click", async function(){
+.addEventListener("click",async()=>{
 
     try{
 
-        const stream =
-        await navigator.mediaDevices
-        .getUserMedia({
+        const stream=
+        await navigator.mediaDevices.getUserMedia({
 
             video:{
                 facingMode:{
@@ -192,13 +238,18 @@ document
 
         video.srcObject=stream;
 
-        video.onloadedmetadata=function(){
+        running=true;
 
-            canvas.width=
-            video.videoWidth;
+        status.innerHTML=
+        "📷 Kamera aktif. Halakan kepada objek.";
 
-            canvas.height=
-            video.videoHeight;
+        video.onloadedmetadata=()=>{
+
+            canvas.width=video.videoWidth;
+
+            canvas.height=video.videoHeight;
+
+            detect();
 
         };
 
@@ -206,9 +257,10 @@ document
 
     catch(error){
 
-        alert(
-        "Kamera tidak dapat dibuka. Sila benarkan akses kamera."
-        );
+        status.innerHTML=
+        "❌ Kamera tidak dapat dibuka.";
+
+        console.log(error);
 
     }
 
@@ -216,61 +268,23 @@ document
 
 
 /* =========================
-   KUBOID 3D
+   OBJECT DETECTION
 ========================= */
 
-let cubeVisible=false;
+async function detect(){
 
-document
-.getElementById("showCube")
-.addEventListener("click",function(){
+    if(!running || !model){
 
-    cubeVisible=!cubeVisible;
+        requestAnimationFrame(detect);
 
-    if(cubeVisible){
-
-        document
-        .getElementById("shape")
-        .innerHTML=
-        '<div class="big">📦 KUBOID</div>';
-
-        document
-        .getElementById("details")
-        .innerHTML=`
-
-        <p>🔵 Sisi: <b>6</b></p>
-
-        <p>🟢 Bucu: <b>8</b></p>
-
-        <p>🟠 Rusuk: <b>12</b></p>
-
-        <p>📐 Muka berbentuk segi empat tepat.</p>
-
-        `;
-
-        drawCube();
+        return;
 
     }
 
-    else{
 
-        ctx.clearRect(
-            0,
-            0,
-            canvas.width,
-            canvas.height
-        );
+    const predictions=
+    await model.detect(video);
 
-    }
-
-});
-
-
-/* =========================
-   PAPAR KUBOID
-========================= */
-
-function drawCube(){
 
     ctx.clearRect(
         0,
@@ -279,148 +293,366 @@ function drawCube(){
         canvas.height
     );
 
-    const w=canvas.width;
 
-    const h=canvas.height;
-
-    const cx=w/2;
-
-    const cy=h/2;
-
-    const size=
-    Math.min(w,h)*0.22;
+    let best=null;
 
 
-    ctx.lineWidth=5;
+    for(const p of predictions){
+
+        if(!best || p.score>best.score){
+
+            best=p;
+
+        }
+
+    }
+
+
+    if(best){
+
+        const objectName=
+        best.class;
+
+        const score=
+        best.score;
+
+
+        drawBox(best);
+
+
+        const shape=
+        convertToShape(objectName);
+
+
+        if(shape){
+
+            showShape(
+                shape,
+                objectName,
+                score
+            );
+
+        }
+
+        else{
+
+            detected.innerHTML=
+            "🤔 "+objectName;
+
+            confidence.innerHTML=
+            "Keyakinan AI: "+
+            Math.round(score*100)+"%";
+
+            geometry.innerHTML=
+            "Objek ini belum dipetakan kepada bentuk geometri.";
+
+        }
+
+    }
+
+    else{
+
+        detected.innerHTML=
+        "🔍 Tiada objek dikesan.";
+
+        confidence.innerHTML="";
+
+    }
+
+
+    requestAnimationFrame(detect);
+
+}
+
+
+/* =========================
+   MAP OBJECT → GEOMETRY
+========================= */
+
+function convertToShape(object){
+
+    object=object.toLowerCase();
+
+
+    /* SILINDER */
+
+    if(
+        object==="bottle" ||
+        object==="cup" ||
+        object==="wine glass" ||
+        object==="vase"
+    ){
+
+        return "silinder";
+
+    }
+
+
+    /* SFERA */
+
+    if(
+        object==="sports ball"
+    ){
+
+        return "sfera";
+
+    }
+
+
+    /* KUBOID */
+
+    if(
+        object==="book" ||
+        object==="laptop" ||
+        object==="keyboard" ||
+        object==="cell phone" ||
+        object==="remote"
+    ){
+
+        return "kuboid";
+
+    }
+
+
+    return null;
+
+}
+
+
+/* =========================
+   PAPAR BENTUK
+========================= */
+
+function showShape(
+    shape,
+    objectName,
+    score
+){
+
+    let name="";
+    let sides="";
+    let vertices="";
+    let edges="";
+    let emoji="";
+
+
+    if(shape==="silinder"){
+
+        name="SILINDER";
+
+        emoji="🥫";
+
+        sides="3";
+
+        vertices="0";
+
+        edges="2";
+
+    }
+
+
+    if(shape==="sfera"){
+
+        name="SFERA";
+
+        emoji="⚽";
+
+        sides="1";
+
+        vertices="0";
+
+        edges="0";
+
+    }
+
+
+    if(shape==="kuboid"){
+
+        name="KUBOID";
+
+        emoji="📦";
+
+        sides="6";
+
+        vertices="8";
+
+        edges="12";
+
+    }
+
+
+    detected.innerHTML=
+    `<div class="detected">
+    ${emoji} ${name}
+    </div>`;
+
+
+    confidence.innerHTML=
+    `AI mengesan: <b>${objectName}</b>
+    (${Math.round(score*100)}%)`;
+
+
+    geometry.innerHTML=`
+
+    <div class="stat">
+    🔵 Sisi: <b>${sides}</b>
+    </div>
+
+    <div class="stat">
+    🟢 Bucu: <b>${vertices}</b>
+    </div>
+
+    <div class="stat">
+    🟠 Rusuk: <b>${edges}</b>
+    </div>
+
+    `;
+
+
+    if(lastShape!==shape){
+
+        lastShape=shape;
+
+        createQuiz(shape);
+
+    }
+
+}
+
+
+/* =========================
+   DRAW DETECTION BOX
+========================= */
+
+function drawBox(prediction){
+
+    const x=
+    prediction.bbox[0];
+
+    const y=
+    prediction.bbox[1];
+
+    const w=
+    prediction.bbox[2];
+
+    const h=
+    prediction.bbox[3];
+
 
     ctx.strokeStyle="#00ff88";
 
-    ctx.fillStyle=
-    "rgba(0,150,255,0.30)";
+    ctx.lineWidth=5;
 
-
-    /*
-       DEPAN
-    */
-
-    ctx.beginPath();
-
-    ctx.moveTo(cx-size,cy-size);
-
-    ctx.lineTo(cx+size,cy-size);
-
-    ctx.lineTo(cx+size,cy+size);
-
-    ctx.lineTo(cx-size,cy+size);
-
-    ctx.closePath();
-
-    ctx.fill();
-
-    ctx.stroke();
-
-
-    /*
-       BELAKANG
-    */
-
-    const offset=size*0.45;
-
-    ctx.beginPath();
-
-    ctx.moveTo(
-        cx-size+offset,
-        cy-size-offset
+    ctx.strokeRect(
+        x,
+        y,
+        w,
+        h
     );
 
-    ctx.lineTo(
-        cx+size+offset,
-        cy-size-offset
-    );
 
-    ctx.lineTo(
-        cx+size+offset,
-        cy+size-offset
-    );
+    ctx.fillStyle="#00ff88";
 
-    ctx.lineTo(
-        cx-size+offset,
-        cy+size-offset
-    );
-
-    ctx.closePath();
-
-    ctx.stroke();
-
-
-    /*
-       SAMBUNGAN
-    */
-
-    const points=[
-
-        [-size,-size],
-
-        [size,-size],
-
-        [size,size],
-
-        [-size,size]
-
-    ];
-
-
-    points.forEach(function(p){
-
-        ctx.beginPath();
-
-        ctx.moveTo(
-            cx+p[0],
-            cy+p[1]
-        );
-
-        ctx.lineTo(
-            cx+p[0]+offset,
-            cy+p[1]-offset
-        );
-
-        ctx.stroke();
-
-    });
-
-
-    /*
-       LABEL
-    */
-
-    ctx.fillStyle="#ffffff";
-
-    ctx.font="bold 22px Arial";
-
-    ctx.textAlign="center";
+    ctx.font="bold 20px Arial";
 
     ctx.fillText(
-        "KUBOID",
-        cx,
-        cy+8
+        prediction.class+
+        " "+
+        Math.round(prediction.score*100)+"%",
+        x,
+        Math.max(25,y-8)
     );
 
 }
 
 
 /* =========================
-   KUIZ
+   QUIZ
 ========================= */
 
-function answer(value){
+function createQuiz(shape){
 
-    const result =
-    document.getElementById("result");
+    const question=
+    document.getElementById("question");
 
-    if(value===6){
+    const answers=
+    document.getElementById("answers");
+
+    document.getElementById(
+        "quizResult"
+    ).innerHTML="";
+
+
+    if(shape==="silinder"){
+
+        question.innerHTML=
+        "🥫 Berapakah bilangan bucu pada silinder?";
+
+        answers.innerHTML=`
+
+        <button onclick="quiz(false)">A. 2</button>
+
+        <button onclick="quiz(true)">B. 0</button>
+
+        <button onclick="quiz(false)">C. 4</button>
+
+        `;
+
+    }
+
+
+    if(shape==="sfera"){
+
+        question.innerHTML=
+        "⚽ Berapakah bilangan bucu pada sfera?";
+
+        answers.innerHTML=`
+
+        <button onclick="quiz(true)">A. 0</button>
+
+        <button onclick="quiz(false)">B. 2</button>
+
+        <button onclick="quiz(false)">C. 4</button>
+
+        `;
+
+    }
+
+
+    if(shape==="kuboid"){
+
+        question.innerHTML=
+        "📦 Berapakah bilangan sisi pada kuboid?";
+
+        answers.innerHTML=`
+
+        <button onclick="quiz(false)">A. 4</button>
+
+        <button onclick="quiz(true)">B. 6</button>
+
+        <button onclick="quiz(false)">C. 8</button>
+
+        <button onclick="quiz(false)">D. 12</button>
+
+        `;
+
+    }
+
+}
+
+
+function quiz(correct){
+
+    const result=
+    document.getElementById(
+        "quizResult"
+    );
+
+
+    if(correct){
 
         result.innerHTML=
-        "🎉 BETUL! Kuboid mempunyai 6 sisi.";
+        "🎉 BETUL! Tahniah!";
 
         result.style.color="green";
 
